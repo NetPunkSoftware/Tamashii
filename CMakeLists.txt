@@ -6,6 +6,11 @@ endif()
 
 project(Fibers VERSION 0.1 LANGUAGES CXX)
 
+option(Boost_USE_STATIC_LIBS        "Use Boost static libs"     ON)
+set(BOOST_VERSION                   "1.77"                      CACHE STRING    "Boost version")
+
+set(CMAKE_CXX_STANDARD              20                          CACHE STRING    "Default C++ standard")
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(target_link_libraries_system)
 

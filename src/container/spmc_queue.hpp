@@ -7,6 +7,7 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include <boost/assert.hpp>
 #include <boost/config.hpp>
@@ -116,7 +117,8 @@ namespace np
             std::atomic_thread_fence( std::memory_order_release);
             bottom_.store( bottom + 1, std::memory_order_relaxed);
         }
-
+        
+        // Pop can only be called from the same thread that pushes
         T * pop() {
             std::size_t bottom = bottom_.load( std::memory_order_relaxed) - 1;
             array * a = array_.load( std::memory_order_relaxed);
