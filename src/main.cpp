@@ -44,7 +44,7 @@ std::atomic<uint32_t> per_thread_count[12] = {
 
 void f1_yield()
 {
-    per_thread_count[np::fiber_pool::instance()->thread_index()]++;
+    per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
 
     plBegin("F1");
     plBegin("F1 EARLY");
@@ -52,7 +52,7 @@ void f1_yield()
     plEnd("F1 EARLY");
     np::this_fiber::yield();
 
-    per_thread_count[np::fiber_pool::instance()->thread_index()]++;
+    per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
     plBegin("F1 LATE");
     spdlog::trace("F1 - LATE");
     plEnd("F1 LATE");
@@ -60,14 +60,14 @@ void f1_yield()
 }
 void f2_yield()
 {
-    per_thread_count[np::fiber_pool::instance()->thread_index()]++;
+    per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
     plBegin("F2");
     plBegin("F2 EARLY");
     spdlog::trace("F2 - EARLY");
     plEnd("F2 EARLY");
     np::this_fiber::yield();
 
-    per_thread_count[np::fiber_pool::instance()->thread_index()]++;
+    per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
     plBegin("F2 LATE");
     spdlog::trace("F2 - LATE");
     plEnd("F2 LATE");
@@ -96,11 +96,11 @@ int main()
     plInitAndStart("Fibers");
 
     constexpr const uint8_t thread_num = 6;
-    np::fiber_pool pool;
+    np::fiber_pool<> pool;
     pool.start(thread_num);
 
-    // pool.push(&f1_yield);
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
+    //pool.push(&f1_yield);
+    //std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // pool.push(&f2_yield);
     // std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -117,7 +117,8 @@ int main()
        pool.push(&f2_yield);
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    spdlog::critical("All submited");
+    std::this_thread::sleep_for(std::chrono::seconds(30));
     pool.end();
 
     for (uint8_t i = 0; i < thread_num; ++i)

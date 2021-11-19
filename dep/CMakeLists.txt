@@ -36,7 +36,7 @@ set(PALANTEER_BUILD_SERVER_SCRIPTING        OFF CACHE INTERNAL "")
 FetchContent_Declare(
     palanteer
     GIT_REPOSITORY https://github.com/dfeneyrou/palanteer
-    GIT_TAG        e305d17585eb2188896ed0c2d7cc0913947dd399
+    GIT_TAG        fd6a6a3e0914eae579216ab43793bd5dc62c53cf
 )
 
 FetchContent_GetProperties(palanteer)

@@ -40,7 +40,8 @@ namespace np
 
     class fiber final
     {
-        friend class fiber_pool;
+        friend class fiber_pool_base;
+        template <typename traits> friend class fiber_pool;
         friend inline boost::context::detail::transfer_t detail::builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
         friend inline void detail::builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
 
@@ -122,7 +123,42 @@ namespace np
         fiber->_record.former = this;
         fiber->_record.latter = fiber;
         fiber->_status = fiber_status::running;
-        boost::context::detail::ontop_fcontext(fiber->_ctx, &fiber->_record, &detail::builtin_fiber_resume);
+
+        using call_fn = boost::context::detail::transfer_t(*)(boost::context::detail::transfer_t);
+        call_fn fiber_resume = &detail::builtin_fiber_resume;
+
+#if defined(_MSC_VER)
+        // Windows fucks up with the registers when calling the on-top function
+        //  which means the entrypoint won't receive the same transfer as the on-top function
+        // In fact, it receives null, completely fucking up the call
+
+        // Thus, we manually make a naked function (as x64 has inline asm disabled)
+        static uint8_t naked_resume[] = {
+            // RAX = reinterpret_cast<detail::record*>(transfer.data)
+            0x48, 0x8b, 0x41, 0x08,     // mov    rax,QWORD PTR[rcx + 0x8]
+            // RAX = record->former
+            0x48, 0x8b, 0x00,           // mov    rax,QWORD PTR[rax]
+            // R9 = transfer.fctx
+            0x4c, 0x8b, 0x09,           // mov    r9,QWORD PTR[rcx]
+            // RAX->_ctx = R9
+            0x4c, 0x89, 0x48, 0x20,     // mov    QWORD PTR[rax + 0x20],r9
+            // Done
+            0xC3                        // ret
+        };
+
+        // Alloc memory only once, copy the bytes, and then point to it
+        static void* naked_resume_ptr = nullptr;
+        static std::once_flag flag;
+        std::call_once(flag, []() {
+            naked_resume_ptr = VirtualAlloc(nullptr, sizeof(naked_resume), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+            std::memcpy(naked_resume_ptr, naked_resume, sizeof(naked_resume));
+        });
+
+        fiber_resume = (call_fn)naked_resume_ptr;
+#endif
+
+        boost::context::detail::ontop_fcontext(fiber->_ctx, &fiber->_record, fiber_resume);
+        //boost::context::detail::ontop_fcontext(fiber->_ctx, &fiber->_record, &detail::builtin_fiber_resume);
         // auto transfer = boost::context::detail::jump_fcontext(fiber->_ctx, &fiber->_record);
         return *fiber;
     }
