@@ -10,6 +10,9 @@ add_library(fibers STATIC ${LIB_SOURCES})
 target_compile_features(fibers PUBLIC cxx_std_20)
 target_include_directories(fibers PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+find_package(Threads REQUIRED)
+target_link_libraries(fibers PUBLIC Threads::Threads)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_definitions(fibers PUBLIC BOOST_ASIO_DISABLE_CONCEPTS)
     target_link_libraries(fibers PUBLIC m)

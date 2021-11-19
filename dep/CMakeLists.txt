@@ -8,6 +8,8 @@ target_link_directories(fibers PUBLIC ${Boost_LIBRARY_DIRS})
 target_link_libraries(fibers PUBLIC Boost::context)
 
 
+####################################################################################
+# MoodyCamel::ConcurrentQueue
 FetchContent_Declare(
     moodycamel
     GIT_REPOSITORY https://github.com/cameron314/concurrentqueue
@@ -21,5 +23,46 @@ if(NOT moodycamel_POPULATED)
     add_subdirectory(${moodycamel_SOURCE_DIR} ${moodycamel_BINARY_DIR})
 endif()
 
-target_link_libraries(fibers PUBLIC concurrentqueue )
+target_link_libraries(fibers PUBLIC concurrentqueue)
 
+
+
+####################################################################################
+# Palanteer
+set(PALANTEER_BUILD_VIEWER                  ON CACHE INTERNAL "")
+set(PALANTEER_BUILD_CPP_EXAMPLE             OFF CACHE INTERNAL "")
+set(PALANTEER_BUILD_PYTHON_INSTRUMENTATION  OFF CACHE INTERNAL "")
+set(PALANTEER_BUILD_SERVER_SCRIPTING        OFF CACHE INTERNAL "")
+FetchContent_Declare(
+    palanteer
+    GIT_REPOSITORY https://github.com/dfeneyrou/palanteer
+    GIT_TAG        e305d17585eb2188896ed0c2d7cc0913947dd399
+)
+
+FetchContent_GetProperties(palanteer)
+if(NOT palanteer_POPULATED)
+    FetchContent_Populate(palanteer)
+
+    add_subdirectory(${palanteer_SOURCE_DIR} ${palanteer_BINARY_DIR})
+endif()
+
+target_link_libraries(fibers PUBLIC libpalanteer)
+target_compile_definitions(fibers PUBLIC USE_PL=1 PL_VIRTUAL_THREADS=1)
+
+
+
+####################################################################################
+# SpdLog
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog
+    GIT_TAG        v1.9.2
+)
+
+FetchContent_GetProperties(spdlog)
+if(NOT spdlog_POPULATED)
+    FetchContent_Populate(spdlog)
+    add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR})
+endif()
+
+target_link_libraries(fibers PUBLIC spdlog)
