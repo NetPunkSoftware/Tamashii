@@ -23,7 +23,8 @@ namespace np
         initialized,
         running,
         ended,
-        yielded
+        yielded,
+        blocked
     };
 
     namespace detail
@@ -66,7 +67,7 @@ namespace np
         ~fiber() noexcept;
 
         template <typename F>
-        void reset(F&& function, uint8_t thread_idx) noexcept;
+        void reset(F&& function) noexcept;
 
         inline fiber& resume(fiber* fiber) noexcept;
         void yield() noexcept;
@@ -75,9 +76,11 @@ namespace np
         inline fiber_status status() const noexcept;
 
     private:
+        void yield_blocking(fiber* to) noexcept;
+
+    private:
         uint32_t _id;
         void* _stack;
-        uint8_t _thread_idx;
         std::size_t _stack_size;
         boost::context::detail::fcontext_t _ctx;
         std::function<void()> _function;
@@ -110,9 +113,8 @@ namespace np
     }
 
     template <typename F>
-    void fiber::reset(F&& function, uint8_t thread_idx) noexcept
+    void fiber::reset(F&& function) noexcept
     {
-        _thread_idx = thread_idx;
         _function = std::forward<F>(function);
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
         _status = fiber_status::initialized;
@@ -141,7 +143,7 @@ namespace np
             // R9 = transfer.fctx
             0x4c, 0x8b, 0x09,           // mov    r9,QWORD PTR[rcx]
             // RAX->_ctx = R9
-            0x4c, 0x89, 0x48, 0x20,     // mov    QWORD PTR[rax + 0x20],r9
+            0x4c, 0x89, 0x48, 0x18,     // mov    QWORD PTR[rax + 0x18],r9
             // Done
             0xC3                        // ret
         };

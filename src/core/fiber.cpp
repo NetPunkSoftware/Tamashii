@@ -67,4 +67,11 @@ namespace np
         _status = fiber_status::yielded;
         boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, &builtin_fiber_yield);
     }
+
+    void fiber::yield_blocking(fiber* to) noexcept
+    {
+        plDetachVirtualThread(true);
+        _status = fiber_status::blocked;
+        boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, &builtin_fiber_yield);
+    }
 }

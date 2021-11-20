@@ -3,6 +3,8 @@
 
 #include "core/fiber.hpp"
 #include "pool/fiber_pool.hpp"
+#include "synchronization/mutex.hpp"
+#include "synchronization/spinlock.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -74,6 +76,22 @@ void f2_yield()
     plEnd("F2");
 }
 
+void f1_mutex(np::spinlock* mutex)
+{
+    mutex->lock(std::chrono::seconds(100));
+    spdlog::critical("Entered f1 lock");
+    std::this_thread::sleep_for(std::chrono::seconds(10)); // HACK: DONT
+    mutex->unlock();
+}
+
+void f2_mutex(np::spinlock* mutex)
+{
+    mutex->lock(std::chrono::seconds(100));
+    spdlog::critical("Entered f2 lock");
+    std::this_thread::sleep_for(std::chrono::seconds(10)); // HACK: DONT
+    mutex->unlock();
+}
+
 int main()
 {
     spdlog::set_level(spdlog::level::level_enum::critical);
@@ -108,6 +126,11 @@ int main()
     // pool.push(&f1_yield);
     // pool.push(&f2_yield);
     // std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    np::spinlock mutex;
+    pool.push([&mutex]() { f1_mutex(&mutex); });
+    pool.push([&mutex]() { f2_mutex(&mutex); });
+    std::this_thread::sleep_for(std::chrono::seconds(30));
 
     global_counter = 0;
     int max_iters = 10000;

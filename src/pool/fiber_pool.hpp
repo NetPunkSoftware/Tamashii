@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/fiber.hpp"
+#include "utils/badge.hpp"
 
 #include <concurrentqueue.h>
 
@@ -25,6 +26,7 @@ namespace np
     class fiber;
     class fiber_pool_base;
     template <typename traits> class fiber_pool;
+    class mutex;
 }
 
 
@@ -56,11 +58,8 @@ namespace np
         fiber* this_fiber() noexcept;
         void yield() noexcept;
 
-        template <typename F>
-        void push(F&& function) noexcept
-        {
-            _tasks.enqueue(std::forward<F>(function));
-        }
+        void block(badge<np::mutex>) noexcept;
+        void unblock(badge<np::mutex>, np::fiber* fiber) noexcept;
 
     protected:
         bool _running;
@@ -70,7 +69,7 @@ namespace np
         std::vector<np::fiber*> _dispatcher_fibers;
         std::vector<np::fiber*> _running_fibers;
         moodycamel::ConcurrentQueue<np::fiber*> _fibers;
-        moodycamel::ConcurrentQueue<np::fiber*> _yielded_fibers;
+        moodycamel::ConcurrentQueue<np::fiber*> _awaiting_fibers;
         moodycamel::ConcurrentQueue<std::function<void()>> _tasks;
     };
 
@@ -85,9 +84,14 @@ namespace np
         void start(uint16_t number_of_threads = 0) noexcept;
         void end() noexcept;
 
+        template <typename F>
+        void push(F&& function) noexcept;
+
+    protected:
+        bool get_free_fiber(np::fiber*& fiber) noexcept;
+
     private:
-        void update_yielded_fibers(uint8_t idx) noexcept;
-        void execute(fiber* fiber, uint8_t idx) noexcept;
+        inline void execute(fiber* fiber, uint8_t idx) noexcept;
     };
 
 
@@ -147,45 +151,60 @@ namespace np
                     // Temporal to hold an enqueued fiber
                     np::fiber* fiber;
 
-                    // Get a task
-                    std::function<void()> fn;
-                    if (!_tasks.try_dequeue(fn))
+                    // Get a free fiber from the pool
+                    if (!_awaiting_fibers.try_dequeue(fiber))
                     {
-                        update_yielded_fibers(idx);
                         continue;
                     }
 
-                    // Get a free fiber from the pool
-                    if (!_fibers.try_dequeue(fiber))
-                    {
-                        if constexpr (traits::preemtive_fiber_creation)
-                        {
-                            update_yielded_fibers(idx);
-                            continue;
-                        }
-                        else
-                        {
-                            if (++_number_of_spawned_fibers > traits::maximum_fibers)
-                            {
-                                _number_of_spawned_fibers = traits::maximum_fibers;
-                                update_yielded_fibers(idx);
-                                continue;
-                            }
-
-#if defined(NDEBUG)
-                            fiber = new np::fiber(empty_fiber_t{});
-#else
-                            fiber = new np::fiber(&detail::invalid_fiber_guard);
-#endif
-                            spdlog::debug("[{}] FIBER {} CREATED", idx, fiber->_id);
-                        }
-                    }
-
-                    fiber->reset(std::move(fn), idx);
                     execute(fiber, idx);
                 }
-                });
+            });
         }
+    }
+
+    template <typename traits>
+    template <typename F>
+    void fiber_pool<traits>::push(F&& function) noexcept
+    {
+        np::fiber* fiber;
+        if (!get_free_fiber(fiber))
+        {
+            _tasks.enqueue(std::forward<F>(function));
+            return;
+        }
+
+        fiber->reset(std::forward<F>(function));
+        _awaiting_fibers.enqueue(fiber);
+    }
+
+    template <typename traits>
+    bool fiber_pool<traits>::get_free_fiber(np::fiber*& fiber) noexcept
+    {
+        if (!_fibers.try_dequeue(fiber))
+        {
+            if constexpr (traits::preemtive_fiber_creation)
+            {
+                return false;
+            }
+            else
+            {
+                if (++_number_of_spawned_fibers > traits::maximum_fibers)
+                {
+                    _number_of_spawned_fibers = traits::maximum_fibers;
+                    return false;
+                }
+
+#if defined(NDEBUG)
+                fiber = new np::fiber(empty_fiber_t{});
+#else
+                fiber = new np::fiber(&detail::invalid_fiber_guard);
+#endif
+                spdlog::debug("[{}] FIBER {} CREATED", fiber->_id);
+            }
+        }
+
+        return true;
     }
 
     template <typename traits>
@@ -199,18 +218,7 @@ namespace np
     }
 
     template <typename traits>
-    void fiber_pool<traits>::update_yielded_fibers(uint8_t idx) noexcept
-    {
-        np::fiber* fibers[10];
-        uint32_t count = _yielded_fibers.try_dequeue_bulk(fibers, 10);
-        for (uint32_t i = 0; i < count; ++i)
-        {
-            execute(fibers[i], idx);
-        }
-    }
-
-    template <typename traits>
-    void fiber_pool<traits>::execute(fiber* fiber, uint8_t idx) noexcept
+    inline void fiber_pool<traits>::execute(fiber* fiber, uint8_t idx) noexcept
     {
         spdlog::debug("[{}] FIBER {}/{} EXECUTE", idx, fiber->_id, fiber->status());
         plAttachVirtualThread(fiber->_id);
@@ -224,11 +232,22 @@ namespace np
         switch (fiber->status())
         {
         case fiber_status::ended:
-            _fibers.enqueue(std::move(fiber));
+            {
+                std::function<void()> task;
+                if (_tasks.try_dequeue(task))
+                {
+                    fiber->reset(std::move(task));
+                    _awaiting_fibers.enqueue(std::move(fiber));
+                }
+                else
+                {
+                    _fibers.enqueue(std::move(fiber));
+                }
+            }
             break;
 
         case fiber_status::yielded:
-            _yielded_fibers.enqueue(std::move(fiber));
+            _awaiting_fibers.enqueue(std::move(fiber));
             break;
 
         default:

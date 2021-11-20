@@ -15,7 +15,7 @@ namespace np
         _dispatcher_fibers(),
         _running_fibers(),
         _fibers(),
-        _yielded_fibers(),
+        _awaiting_fibers(),
         _tasks()
     {
         detail::fiber_pool_instance = this;
@@ -33,6 +33,20 @@ namespace np
         auto dispatcher = _dispatcher_fibers[index];
         spdlog::debug("[{}] FIBER {}/{} YIELD", index, fiber->_id, fiber->status());
         fiber->yield(dispatcher);
+    }
+
+    void fiber_pool_base::block(badge<np::mutex>) noexcept
+    {
+        auto index = thread_index();
+        auto fiber = _running_fibers[index];
+        auto dispatcher = _dispatcher_fibers[index];
+        spdlog::debug("[{}] FIBER {}/{} BLOCK", index, fiber->_id, fiber->status());
+        fiber->yield_blocking(dispatcher);
+    }
+
+    void fiber_pool_base::unblock(badge<np::mutex>, np::fiber* fiber) noexcept
+    {
+        _awaiting_fibers.enqueue(fiber);
     }
 
     uint8_t fiber_pool_base::thread_index() const noexcept

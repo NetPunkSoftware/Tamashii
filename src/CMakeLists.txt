@@ -3,7 +3,10 @@ set(LIB_SOURCES
     core/fiber.hpp
     core/fiber.cpp
     pool/fiber_pool.hpp
-    pool/fiber_pool.cpp)
+    pool/fiber_pool.cpp
+    synchronization/mutex.hpp
+    synchronization/spinlock.hpp
+    utils/badge.hpp)
 
 # LIBRARY
 add_library(fibers STATIC ${LIB_SOURCES})
