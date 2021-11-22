@@ -49,6 +49,75 @@ namespace np
         _awaiting_fibers.enqueue(fiber);
     }
 
+    void fiber_pool_base::worker_thread(uint8_t idx) noexcept
+    {
+        plDeclareThreadDyn("Workers/%d", idx);
+
+        // Thread data
+        _thread_ids[idx] = std::this_thread::get_id();
+
+        // Keep on getting tasks and running them
+        while (_running)
+        {
+            // Temporal to hold an enqueued fiber
+            np::fiber* fiber;
+
+            // Get a free fiber from the pool
+            if (!_awaiting_fibers.try_dequeue(fiber))
+            {
+#if defined(NETPUNK_SPINLOCK_PAUSE)
+#if defined(_MSC_VER)
+                _mm_pause();
+#else
+                __builtin_ia32_pause();
+#endif
+#endif // NETPUNK_SPINLOCK_PAUSE
+                continue;
+            }
+
+            spdlog::debug("[{}] FIBER {}/{} EXECUTE", idx, fiber->_id, fiber->status());
+            plAttachVirtualThread(fiber->_id);
+
+            // Change execution context
+            _running_fibers[idx] = fiber;
+            _dispatcher_fibers[idx]->resume(fiber);
+            spdlog::debug("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
+
+            // Push fiber back
+            switch (fiber->status())
+            {
+                case fiber_status::ended:
+                {
+                    std::function<void()> task;
+                    if (_tasks.try_dequeue(task))
+                    {
+                        fiber->reset(std::move(task));
+                        _awaiting_fibers.enqueue(std::move(fiber));
+                    }
+                    else
+                    {
+                        _fibers.enqueue(std::move(fiber));
+                    }
+                }
+                break;
+
+                case fiber_status::yielded:
+                    _awaiting_fibers.enqueue(std::move(fiber));
+                    break;
+
+                case fiber_status::blocked:
+                    // Do nothing, the mutex will already hold a reference to the fiber
+                    break;
+
+                default:
+                    assert(false && "Fiber ended with unexpected status");
+                    unreachable();
+                    abort();
+                    break;
+            }
+        }
+    }
+
     uint8_t fiber_pool_base::thread_index() const noexcept
     {
         for (int idx = 0, size = _thread_ids.size(); idx < size; ++idx)

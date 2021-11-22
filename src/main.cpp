@@ -4,6 +4,7 @@
 #include "core/fiber.hpp"
 #include "pool/fiber_pool.hpp"
 #include "synchronization/mutex.hpp"
+#include "synchronization/one_way_barrier.hpp"
 #include "synchronization/spinlock.hpp"
 
 #include <spdlog/spdlog.h>
@@ -76,21 +77,99 @@ void f2_yield()
     plEnd("F2");
 }
 
-void f1_mutex(np::spinlock* mutex)
+void f1_spinlock(np::spinlock* mutex)
 {
     mutex->lock(std::chrono::seconds(100));
-    spdlog::critical("Entered f1 lock");
+    spdlog::critical("Entered f1 spinlock");
     std::this_thread::sleep_for(std::chrono::seconds(10)); // HACK: DONT
     mutex->unlock();
 }
 
-void f2_mutex(np::spinlock* mutex)
+void f2_spinlock(np::spinlock* mutex)
 {
     mutex->lock(std::chrono::seconds(100));
-    spdlog::critical("Entered f2 lock");
+    spdlog::critical("Entered f2 spinlock");
     std::this_thread::sleep_for(std::chrono::seconds(10)); // HACK: DONT
     mutex->unlock();
 }
+
+std::atomic<uint8_t> in_critical_section = 0;
+
+void f1_mutex(np::mutex* mutex)
+{
+    mutex->lock();
+    spdlog::critical("Entered f1 lock");
+    assert(++in_critical_section == 1);
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // HACK: DONT
+    --in_critical_section;
+    mutex->unlock();
+    spdlog::critical("Unlocked f1 lock");
+}
+
+void f2_mutex(np::mutex* mutex)
+{
+    mutex->lock();
+    spdlog::critical("Entered f2 lock");
+    assert(++in_critical_section == 1);
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // HACK: DONT
+    --in_critical_section;
+    mutex->unlock();
+    spdlog::critical("Unlocked f2 lock");
+}
+
+void f3_mutex(np::mutex* mutex)
+{
+    mutex->lock();
+    spdlog::critical("Entered f3 lock");
+    assert(++in_critical_section == 1);
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // HACK: DONT
+    --in_critical_section;
+    mutex->unlock();
+    spdlog::critical("Unlocked f3 lock");
+}
+
+std::atomic<uint8_t> count_barrier = 0;
+
+void f1_one_way_barrier(np::one_way_barrier* one_way_barrier)
+{
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // HACK: DONT
+    ++count_barrier;
+    spdlog::critical("Entered f1 oneway");
+    one_way_barrier->decrease();
+}
+
+void f2_one_way_barrier(np::one_way_barrier* one_way_barrier)
+{
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // HACK: DONT
+    ++count_barrier;
+    spdlog::critical("Entered f2 oneway");
+    one_way_barrier->decrease();
+}
+
+void f3_one_way_barrier(np::one_way_barrier* one_way_barrier)
+{
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // HACK: DONT
+    ++count_barrier;
+    spdlog::critical("Entered f3 oneway");
+    one_way_barrier->decrease();
+}
+
+void main_fiber(np::fiber_pool<>& pool)
+{
+    np::one_way_barrier one_way_barrier(3);
+    pool.push([&one_way_barrier]() { f1_one_way_barrier(&one_way_barrier); });
+    pool.push([&one_way_barrier]() { f2_one_way_barrier(&one_way_barrier); });
+    pool.push([&one_way_barrier]() { f3_one_way_barrier(&one_way_barrier); });
+
+    spdlog::critical("WAITING");
+    one_way_barrier.wait();
+    assert(count_barrier == 3);
+    spdlog::critical("DONE");
+
+
+    pool.end();
+}
+
 
 int main()
 {
@@ -113,9 +192,15 @@ int main()
 
     plInitAndStart("Fibers");
 
+
     constexpr const uint8_t thread_num = 6;
     np::fiber_pool<> pool;
+    pool.push([&pool] { main_fiber(pool); });
     pool.start(thread_num);
+    pool.join();
+
+    plStopAndUninit();
+    return 0;
 
     //pool.push(&f1_yield);
     //std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -127,18 +212,37 @@ int main()
     // pool.push(&f2_yield);
     // std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    np::spinlock mutex;
-    pool.push([&mutex]() { f1_mutex(&mutex); });
-    pool.push([&mutex]() { f2_mutex(&mutex); });
-    std::this_thread::sleep_for(std::chrono::seconds(30));
+    //np::spinlock spinlock;
+    //pool.push([&spinlock]() { f1_spinlock(&spinlock); });
+    //pool.push([&spinlock]() { f2_spinlock(&spinlock); });
+    //std::this_thread::sleep_for(std::chrono::seconds(30));
 
-    global_counter = 0;
-    int max_iters = 10000;
-    for (int i = 0; i < max_iters; ++i)
-    {
-       pool.push(&f1_yield);
-       pool.push(&f2_yield);
-    }
+    //np::mutex mutex;
+    //pool.push([&mutex]() { f1_mutex(&mutex); });
+    //pool.push([&mutex]() { f2_mutex(&mutex); });
+    //pool.push([&mutex]() { f3_mutex(&mutex); });
+    //pool.push([&mutex]() { f3_mutex(&mutex); });
+    //pool.push([&mutex]() { f3_mutex(&mutex); });
+    //pool.push([&mutex]() { f3_mutex(&mutex); });
+    //pool.push([&mutex]() { f3_mutex(&mutex); });
+    //pool.push([&mutex]() { f3_mutex(&mutex); });
+    //pool.push([&mutex]() { f3_mutex(&mutex); });
+    //std::this_thread::sleep_for(std::chrono::seconds(30));
+
+
+    np::one_way_barrier one_way_barrier(3);
+    pool.push([&one_way_barrier]() { f1_one_way_barrier(&one_way_barrier); });
+    pool.push([&one_way_barrier]() { f2_one_way_barrier(&one_way_barrier); });
+    pool.push([&one_way_barrier]() { f3_one_way_barrier(&one_way_barrier); });
+    pool.push([&one_way_barrier] { 
+        spdlog::critical("WAITING");
+        one_way_barrier.wait(); 
+        spdlog::critical("DONE");
+        assert(count_barrier == 3);  
+    });
+    //std::this_thread::sleep_for(std::chrono::seconds(30));
+    
+    
 
     spdlog::critical("All submited");
     std::this_thread::sleep_for(std::chrono::seconds(30));
@@ -149,7 +253,6 @@ int main()
         spdlog::critical("Thread {}\t{}", i, per_thread_count[i]);
     }
 
-    plStopAndUninit();
 
     return 0;
 }

@@ -35,7 +35,7 @@ namespace np
             for (;;)
             {
                 status expect = status::locked;
-                if (!_status.compare_exchange_weak(expect, status::adding_to_waitlist))
+                if (!_status.compare_exchange_strong(expect, status::adding_to_waitlist))
                 {
                     if (expect == status::unlocked)
                     {
@@ -59,8 +59,9 @@ namespace np
                 assert(detail::fiber_pool_instance != nullptr && "Mutexes that end spinlock periods require a fiber pool");
 
                 _waiting_fibers.enqueue(detail::fiber_pool_instance->this_fiber());
+                //_status.store(status::locked, std::memory_order_release);
+                _status.store(status::locked);
                 detail::fiber_pool_instance->block({});
-                _status.store(status::locked, std::memory_order_acquire);
             }
         }
 
@@ -89,7 +90,6 @@ namespace np
             }
 
             // Unblock all waiting fibers
-            // This is safe, as all other fibers are either in a spinlock or already in waiting_list
             np::fiber* fiber;
             while (_waiting_fibers.try_dequeue(fiber))
             {

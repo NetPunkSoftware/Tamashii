@@ -5,6 +5,7 @@ set(LIB_SOURCES
     pool/fiber_pool.hpp
     pool/fiber_pool.cpp
     synchronization/mutex.hpp
+    synchronization/one_way_barrier.hpp
     synchronization/spinlock.hpp
     utils/badge.hpp)
 

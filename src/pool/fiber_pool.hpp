@@ -51,6 +51,8 @@ namespace np
 
     class fiber_pool_base
     {
+        template <typename traits> friend class fiber_pool;
+
     public:
         fiber_pool_base() noexcept;
 
@@ -60,6 +62,9 @@ namespace np
 
         void block(badge<np::mutex>) noexcept;
         void unblock(badge<np::mutex>, np::fiber* fiber) noexcept;
+
+    protected:
+        void worker_thread(uint8_t idx) noexcept;
 
     protected:
         bool _running;
@@ -77,23 +82,43 @@ namespace np
     class fiber_pool : public fiber_pool_base
     {
     public:
-        using fiber_pool_base::fiber_pool_base;
+        fiber_pool() noexcept;
 
         static fiber_pool<traits>* instance() noexcept;
 
         void start(uint16_t number_of_threads = 0) noexcept;
         void end() noexcept;
+        void join() noexcept;
 
         template <typename F>
         void push(F&& function) noexcept;
 
     protected:
         bool get_free_fiber(np::fiber*& fiber) noexcept;
-
-    private:
-        inline void execute(fiber* fiber, uint8_t idx) noexcept;
     };
 
+
+    template <typename traits>
+    fiber_pool<traits>::fiber_pool() noexcept :
+        fiber_pool_base()
+    {
+        if constexpr (traits::preemtive_fiber_creation)
+        {
+            np::fiber** fibers = new np::fiber * [traits::maximum_fibers];
+            for (uint32_t i = 0; i < traits::maximum_fibers; ++i)
+            {
+
+#if defined(NDEBUG)
+                fibers[i] = new np::fiber(empty_fiber_t{});
+#else
+                fibers[i] = new np::fiber(&detail::invalid_fiber_guard);
+#endif
+            }
+
+            _fibers.enqueue_bulk(fibers, traits::maximum_fibers);
+            delete[] fibers;
+        }
+    }
 
     template <typename traits>
     fiber_pool<traits>* fiber_pool<traits>::instance() noexcept
@@ -117,50 +142,17 @@ namespace np
 
         plDeclareThread("Workers/0");
 
-        if constexpr (traits::preemtive_fiber_creation)
-        {
-            np::fiber** fibers = new np::fiber*[traits::maximum_fibers];
-            for (uint32_t i = 0; i < traits::maximum_fibers; ++i)
-            {
-
-#if defined(NDEBUG)
-                fibers[i] = new np::fiber(empty_fiber_t{});
-#else
-                fibers[i] = new np::fiber(&detail::invalid_fiber_guard);
-#endif
-            }
-
-            _fibers.enqueue_bulk(fibers, traits::maximum_fibers);
-            delete[] fibers;
-        }
-
+        // Execute in other threads
         for (int idx = 1; idx < number_of_threads; ++idx)
         {
             // Set dispatcher fiber
             _dispatcher_fibers[idx] = new np::fiber(empty_fiber_t{});
-
-            _worker_threads.emplace_back([this, idx]() {
-                plDeclareThreadDyn("Workers/%d", idx);
-
-                // Thread data
-                _thread_ids[idx] = std::this_thread::get_id();
-
-                // Keep on getting tasks and running them
-                while (_running)
-                {
-                    // Temporal to hold an enqueued fiber
-                    np::fiber* fiber;
-
-                    // Get a free fiber from the pool
-                    if (!_awaiting_fibers.try_dequeue(fiber))
-                    {
-                        continue;
-                    }
-
-                    execute(fiber, idx);
-                }
-            });
+            _worker_threads.emplace_back(&fiber_pool_base::worker_thread, this, idx);
         }
+
+        // Execute in main thread
+        _dispatcher_fibers[0] = new np::fiber(empty_fiber_t{});
+        worker_thread(0);
     }
 
     template <typename traits>
@@ -211,50 +203,14 @@ namespace np
     void fiber_pool<traits>::end() noexcept
     {
         _running = false;
-        for (auto& t : _worker_threads)
-        {
-            t.join();
-        }
     }
 
     template <typename traits>
-    inline void fiber_pool<traits>::execute(fiber* fiber, uint8_t idx) noexcept
+    void fiber_pool<traits>::join() noexcept
     {
-        spdlog::debug("[{}] FIBER {}/{} EXECUTE", idx, fiber->_id, fiber->status());
-        plAttachVirtualThread(fiber->_id);
-
-        // Change execution context
-        _running_fibers[idx] = fiber;
-        _dispatcher_fibers[idx]->resume(fiber);
-        spdlog::debug("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
-
-        // Push fiber back
-        switch (fiber->status())
+        for (auto& t : _worker_threads)
         {
-        case fiber_status::ended:
-            {
-                std::function<void()> task;
-                if (_tasks.try_dequeue(task))
-                {
-                    fiber->reset(std::move(task));
-                    _awaiting_fibers.enqueue(std::move(fiber));
-                }
-                else
-                {
-                    _fibers.enqueue(std::move(fiber));
-                }
-            }
-            break;
-
-        case fiber_status::yielded:
-            _awaiting_fibers.enqueue(std::move(fiber));
-            break;
-
-        default:
-            assert(false && "Fiber ended with unexpected status");
-            unreachable();
-            abort();
-            break;
+            t.join();
         }
     }
 
