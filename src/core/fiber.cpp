@@ -17,6 +17,10 @@ namespace np
         fiber{ 524288, nullptr }
     {}
 
+    fiber::fiber(std::size_t stack_size, empty_fiber_t)  noexcept :
+        fiber{ stack_size, nullptr }
+    {}
+
     fiber::fiber(fiber&& other) noexcept :
         fiber()
     {
@@ -39,11 +43,11 @@ namespace np
     
     fiber::~fiber() noexcept
     {
-#ifdef _MSC_VER
-        _aligned_free(_stack);
-#else
-        std::free(_stack);
-#endif // _MSC_VER
+#if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+        detail::memory_guard_release(_stack, page_size);
+        detail::memory_guard_release(static_cast<char*>(_stack) + page_size + _stack_size, page_size);
+#endif
+        detail::aligned_free(_stack);
     }
 
     inline boost::context::detail::transfer_t builtin_fiber_yield(boost::context::detail::transfer_t transfer)

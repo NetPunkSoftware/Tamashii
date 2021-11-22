@@ -44,6 +44,7 @@ namespace np
             static const bool preemtive_fiber_creation = true;
             static const uint32_t maximum_fibers = 100;
             static const uint32_t yield_priority = 2;
+            static const uint32_t fiber_stack_size = 524288;
         };
 
         inline fiber_pool_base* fiber_pool_instance = nullptr;
@@ -109,9 +110,9 @@ namespace np
             {
 
 #if defined(NDEBUG)
-                fibers[i] = new np::fiber(empty_fiber_t{});
+                fibers[i] = new np::fiber(traits::fiber_stack_size, empty_fiber_t{});
 #else
-                fibers[i] = new np::fiber(&detail::invalid_fiber_guard);
+                fibers[i] = new np::fiber(traits::fiber_stack_size, &detail::invalid_fiber_guard);
 #endif
             }
 
@@ -146,12 +147,12 @@ namespace np
         for (int idx = 1; idx < number_of_threads; ++idx)
         {
             // Set dispatcher fiber
-            _dispatcher_fibers[idx] = new np::fiber(empty_fiber_t{});
+            _dispatcher_fibers[idx] = new np::fiber(traits::fiber_stack_size, empty_fiber_t{});
             _worker_threads.emplace_back(&fiber_pool_base::worker_thread, this, idx);
         }
 
         // Execute in main thread
-        _dispatcher_fibers[0] = new np::fiber(empty_fiber_t{});
+        _dispatcher_fibers[0] = new np::fiber(traits::fiber_stack_size, empty_fiber_t{});
         worker_thread(0);
     }
 
@@ -188,9 +189,9 @@ namespace np
                 }
 
 #if defined(NDEBUG)
-                fiber = new np::fiber(empty_fiber_t{});
+                fiber = new np::fiber(traits::fiber_stack_size, empty_fiber_t{});
 #else
-                fiber = new np::fiber(&detail::invalid_fiber_guard);
+                fiber = new np::fiber(traits::fiber_stack_size, &detail::invalid_fiber_guard);
 #endif
                 spdlog::debug("[{}] FIBER {} CREATED", fiber->_id);
             }

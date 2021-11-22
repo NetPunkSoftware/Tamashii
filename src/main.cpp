@@ -166,6 +166,13 @@ void main_fiber(np::fiber_pool<>& pool)
     assert(count_barrier == 3);
     spdlog::critical("DONE");
 
+    global_counter = 0;
+    int max_iters = 10000;
+    for (int i = 0; i < max_iters; ++i)
+    {
+        pool.push(&f1_yield);
+        pool.push(&f2_yield);
+    }
 
     pool.end();
 }

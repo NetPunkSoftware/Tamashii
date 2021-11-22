@@ -10,6 +10,17 @@
 #include <functional>
 
 
+#if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+#   if !defined(_MSC_VER)
+#		include <sys/mman.h>
+#		include <unistd.h>
+#	else
+#		define WIN32_LEAN_AND_MEAN
+#		define NOMINMAX
+#		include <Windows.h>
+#	endif
+#endif
+
 namespace np
 {
     class fiber;
@@ -32,6 +43,69 @@ namespace np
         inline boost::context::detail::transfer_t builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
         inline void builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
 
+        inline std::size_t page_size() noexcept
+        {
+#if defined(_MSC_VER)
+            SYSTEM_INFO sysInfo;
+            GetSystemInfo(&sysInfo);
+            return sysInfo.dwPageSize;
+#else
+            return static_cast<size_t>(getpagesize());
+#endif
+        }
+
+        inline std::size_t round_up(std::size_t stack_size, std::size_t page_size_or_zero) {
+            if (page_size_or_zero == 0)
+            {
+                return stack_size;
+            }
+
+            std::size_t const remainder = stack_size % page_size_or_zero;
+            if (remainder == 0) {
+                return stack_size;
+            }
+
+            return stack_size + page_size_or_zero - remainder;
+        }
+
+        inline auto aligned_malloc(std::size_t size, std::size_t alignment)
+        {
+#ifdef _MSC_VER
+            return _aligned_malloc(size, alignment);
+#else
+            return std::aligned_alloc(alignment, size);
+#endif // _MSC_VER
+        }
+
+        inline void aligned_free(void* ptr)
+        {
+#ifdef _MSC_VER
+            return _aligned_free(ptr);
+#else
+            return std::free(ptr);
+#endif // _MSC_VER
+        }
+
+        inline void memory_guard(void* addr, std::size_t len)
+        {
+#ifdef _MSC_VER
+            DWORD prev;
+            VirtualProtect(addr, len, PAGE_NOACCESS, &prev);
+#else
+            mprotect(addr, len, PROT_NONE);
+#endif // _MSC_VER
+        }
+
+        inline void memory_guard_release(void* addr, std::size_t len)
+        {
+#ifdef _MSC_VER
+            DWORD prev;
+            VirtualProtect(addr, len, PAGE_READWRITE, &prev);
+#else
+            mprotect(addr, len, PROT_READ | PROT_WRITE);
+#endif // _MSC_VER
+        }
+
         struct record
         {
             np::fiber* former;
@@ -47,10 +121,12 @@ namespace np
         friend inline void detail::builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
 
         static inline uint32_t current_id = 0;
+        static inline std::size_t page_size = detail::page_size();
 
     public:
         fiber() noexcept;
         fiber(empty_fiber_t) noexcept;
+        fiber(std::size_t stack_size, empty_fiber_t) noexcept;
 
         template <typename F>
         fiber(F&& function) noexcept;
@@ -91,32 +167,39 @@ namespace np
 
     template <typename F>
     fiber::fiber(F&& function) noexcept :
-        fiber { 524288, std::forward<F>(function) }
+        fiber{ 524288, std::forward<F>(function) }
     {}
 
     template <typename F>
     fiber::fiber(std::size_t stack_size, F&& function) noexcept :
         _id(current_id++),
-        _stack_size(stack_size),
         _function(std::forward<F>(function)),
         _status(fiber_status::initialized)
     {
         plDeclareVirtualThread(_id, "Fibers/%d", _id);
 
-#ifdef _MSC_VER
-        _stack = _aligned_malloc(_stack_size, 8);
-#else
-        _stack = std::aligned_alloc(0, _stack_size);
-#endif // _MSC_VER
+#if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+        _stack_size = detail::round_up(stack_size, page_size);
+        _stack = detail::aligned_malloc(page_size + _stack_size + page_size, page_size);
+        _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
 
+        detail::memory_guard(_stack, page_size);
+        detail::memory_guard(static_cast<char*>(_stack) + page_size + _stack_size, page_size);
+#else
+        _stack = detail::aligned_malloc(_stack_size, page_size);
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
+#endif
     }
 
     template <typename F>
     void fiber::reset(F&& function) noexcept
     {
         _function = std::forward<F>(function);
+#if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+        _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
+#else
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
+#endif
         _status = fiber_status::initialized;
     }
 
