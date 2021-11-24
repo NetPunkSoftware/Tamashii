@@ -1,5 +1,7 @@
 #pragma once
 
+#include "synchronization/counter.hpp"
+
 #include <boost/context/fiber_fcontext.hpp>
 #include <boost/context/detail/fcontext.hpp>
 
@@ -106,6 +108,8 @@ namespace np
 #endif // _MSC_VER
         }
 
+        inline counter dummy_counter{};
+
         struct record
         {
             np::fiber* former;
@@ -125,14 +129,19 @@ namespace np
 
     public:
         fiber() noexcept;
+        fiber(const char* fiber_name) noexcept;
         fiber(empty_fiber_t) noexcept;
         fiber(std::size_t stack_size, empty_fiber_t) noexcept;
+        fiber(const char* fiber_name, std::size_t stack_size, empty_fiber_t) noexcept;
 
         template <typename F>
         fiber(F&& function) noexcept;
 
         template <typename F>
         fiber(std::size_t stack_size, F&& function) noexcept;
+
+        template <typename F>
+        fiber(const char* fiber_name, std::size_t stack_size, F&& function) noexcept;
 
         fiber(const fiber&) = delete;
         fiber& operator=(const fiber&) = delete;
@@ -145,14 +154,19 @@ namespace np
         template <typename F>
         void reset(F&& function) noexcept;
 
+        template <typename F>
+        void reset(F&& function, np::counter& counter) noexcept;
+
         inline fiber& resume(fiber* fiber) noexcept;
         void yield() noexcept;
         void yield(fiber* to) noexcept;
 
         inline fiber_status status() const noexcept;
+        inline np::counter* counter() noexcept;
 
     private:
         void yield_blocking(fiber* to) noexcept;
+        inline void execute() noexcept;
 
     private:
         uint32_t _id;
@@ -162,6 +176,8 @@ namespace np
         std::function<void()> _function;
         fiber_status _status;
 
+        // Fiber switching
+        np::counter* _counter;
         detail::record _record;
     };
 
@@ -171,12 +187,18 @@ namespace np
     {}
 
     template <typename F>
-    fiber::fiber(std::size_t stack_size, F&& function) noexcept :
+    fiber::fiber(std::size_t stack_size, F && function) noexcept :
+        fiber{ "Fibers/%d", stack_size, std::forward<F>(function) }
+    {}
+
+    template <typename F>
+    fiber::fiber(const char* fiber_name, std::size_t stack_size, F&& function) noexcept :
         _id(current_id++),
         _function(std::forward<F>(function)),
-        _status(fiber_status::initialized)
+        _status(fiber_status::initialized),
+        _counter(&detail::dummy_counter)
     {
-        plDeclareVirtualThread(_id, "Fibers/%d", _id);
+        plDeclareVirtualThread(_id, fiber_name, _id);
 
 #if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
         _stack_size = detail::round_up(stack_size, page_size);
@@ -192,9 +214,16 @@ namespace np
     }
 
     template <typename F>
-    void fiber::reset(F&& function) noexcept
+    inline void fiber::reset(F&& function) noexcept
+    {
+        reset(std::forward<F>(function), detail::dummy_counter);
+    }
+
+    template <typename F>
+    inline void fiber::reset(F&& function, np::counter& counter) noexcept
     {
         _function = std::forward<F>(function);
+        _counter = &counter;
 #if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
 #else
@@ -236,6 +265,7 @@ namespace np
         static std::once_flag flag;
         std::call_once(flag, []() {
             naked_resume_ptr = VirtualAlloc(nullptr, sizeof(naked_resume), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+            assert(naked_resume_ptr != nullptr && "Could not alloc memory for fiber naked resume");
             std::memcpy(naked_resume_ptr, naked_resume, sizeof(naked_resume));
         });
 
@@ -253,6 +283,19 @@ namespace np
         return _status;
     }
 
+    inline np::counter* fiber::counter() noexcept
+    {
+        return _counter;
+    }
+    
+    inline void fiber::execute() noexcept
+    {
+        _function();
+        _counter->done({});
+        _status = fiber_status::ended;
+        plDetachVirtualThread(false);
+    }
+
     namespace detail
     {
         inline boost::context::detail::transfer_t builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept
@@ -265,9 +308,7 @@ namespace np
         inline void builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept
         {
             auto record = reinterpret_cast<detail::record*>(transfer.data);
-            record->latter->_function();
-            record->latter->_status = fiber_status::ended;
-            plDetachVirtualThread(false);
+            record->latter->execute();
             //fiber->_ctx = boost::context::detail::jump_fcontext(transfer.fctx, 0).fctx;
             boost::context::detail::jump_fcontext(record->former->_ctx, 0);
         }

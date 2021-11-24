@@ -45,6 +45,14 @@ std::atomic<uint32_t> per_thread_count[12] = {
     0, 0, 0, 0
 };
 
+
+inline int fib(int n) noexcept
+{
+    if (n <= 1)
+        return n;
+    return fib(n - 1) + fib(n - 2);
+}
+
 void f1_yield()
 {
     per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
@@ -55,9 +63,11 @@ void f1_yield()
     plEnd("F1 EARLY");
     np::this_fiber::yield();
 
+    global_counter++;
     per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
+
     plBegin("F1 LATE");
-    spdlog::trace("F1 - LATE");
+    spdlog::trace("F1 - LATE = {}", fib(25));
     plEnd("F1 LATE");
     plEnd("F1");
 }
@@ -70,9 +80,10 @@ void f2_yield()
     plEnd("F2 EARLY");
     np::this_fiber::yield();
 
+    global_counter++;
     per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
     plBegin("F2 LATE");
-    spdlog::trace("F2 - LATE");
+    spdlog::trace("F2 - LATE = {}", fib(25));
     plEnd("F2 LATE");
     plEnd("F2");
 }
@@ -166,13 +177,19 @@ void main_fiber(np::fiber_pool<>& pool)
     assert(count_barrier == 3);
     spdlog::critical("DONE");
 
+    np::counter counter;
     global_counter = 0;
-    int max_iters = 10000;
+    int max_iters = 20;
     for (int i = 0; i < max_iters; ++i)
     {
-        pool.push(&f1_yield);
-        pool.push(&f2_yield);
+        pool.push(&f1_yield, counter);
+        pool.push(&f2_yield, counter);
     }
+
+    spdlog::critical("WAIT {}", max_iters);
+    counter.wait();
+    assert(global_counter == max_iters * 2);
+    spdlog::critical("DONE");
 
     pool.end();
 }

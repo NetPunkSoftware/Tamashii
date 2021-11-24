@@ -4,13 +4,18 @@
 namespace np
 {
     fiber::fiber() noexcept :
+        fiber { "Fibers/%d" }
+    {}
+
+    fiber::fiber(const char* fiber_name) noexcept :
         _id(current_id++),
         _stack(nullptr),
         _stack_size(0),
         _ctx(nullptr),
-        _function(nullptr)
+        _function(nullptr),
+        _counter(&detail::dummy_counter)
     {
-        plDeclareVirtualThread(_id, "Fibers/%d", _id);
+        plDeclareVirtualThread(_id, fiber_name, _id);
     }
     
     fiber::fiber(empty_fiber_t)  noexcept :
@@ -18,7 +23,11 @@ namespace np
     {}
 
     fiber::fiber(std::size_t stack_size, empty_fiber_t)  noexcept :
-        fiber{ stack_size, nullptr }
+        fiber{ "Fibers/%d", stack_size, nullptr }
+    {}
+
+    fiber::fiber(const char* fiber_name, std::size_t stack_size, empty_fiber_t)   noexcept :
+        fiber{ fiber_name, stack_size, nullptr }
     {}
 
     fiber::fiber(fiber&& other) noexcept :

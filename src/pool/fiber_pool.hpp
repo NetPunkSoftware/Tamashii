@@ -23,6 +23,7 @@ inline void unreachable() {}
 
 namespace np
 {
+    class counter;
     class fiber;
     class fiber_pool_base;
     template <typename traits> class fiber_pool;
@@ -42,7 +43,7 @@ namespace np
         struct default_fiber_pool_traits
         {
             static const bool preemtive_fiber_creation = true;
-            static const uint32_t maximum_fibers = 100;
+            static const uint32_t maximum_fibers = 10;
             static const uint32_t yield_priority = 2;
             static const uint32_t fiber_stack_size = 524288;
         };
@@ -50,9 +51,16 @@ namespace np
         inline fiber_pool_base* fiber_pool_instance = nullptr;
     }
 
+
     class fiber_pool_base
     {
         template <typename traits> friend class fiber_pool;
+
+        struct task_bundle
+        {
+            np::counter* counter;
+            std::function<void()> function;
+        };
 
     public:
         fiber_pool_base() noexcept;
@@ -66,6 +74,7 @@ namespace np
 
     protected:
         void worker_thread(uint8_t idx) noexcept;
+        np::counter* get_dummy_counter() noexcept;
 
     protected:
         bool _running;
@@ -76,7 +85,7 @@ namespace np
         std::vector<np::fiber*> _running_fibers;
         moodycamel::ConcurrentQueue<np::fiber*> _fibers;
         moodycamel::ConcurrentQueue<np::fiber*> _awaiting_fibers;
-        moodycamel::ConcurrentQueue<std::function<void()>> _tasks;
+        moodycamel::ConcurrentQueue<task_bundle> _tasks;
     };
 
     template <typename traits = detail::default_fiber_pool_traits>
@@ -93,6 +102,9 @@ namespace np
 
         template <typename F>
         void push(F&& function) noexcept;
+
+        template <typename F>
+        void push(F&& function, np::counter& counter) noexcept;
 
     protected:
         bool get_free_fiber(np::fiber*& fiber) noexcept;
@@ -141,18 +153,16 @@ namespace np
         _thread_ids[0] = std::this_thread::get_id();
         _running = true;
 
-        plDeclareThread("Workers/0");
-
         // Execute in other threads
         for (int idx = 1; idx < number_of_threads; ++idx)
         {
             // Set dispatcher fiber
-            _dispatcher_fibers[idx] = new np::fiber(traits::fiber_stack_size, empty_fiber_t{});
+            _dispatcher_fibers[idx] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
             _worker_threads.emplace_back(&fiber_pool_base::worker_thread, this, idx);
         }
 
         // Execute in main thread
-        _dispatcher_fibers[0] = new np::fiber(traits::fiber_stack_size, empty_fiber_t{});
+        _dispatcher_fibers[0] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
         worker_thread(0);
     }
 
@@ -163,11 +173,34 @@ namespace np
         np::fiber* fiber;
         if (!get_free_fiber(fiber))
         {
-            _tasks.enqueue(std::forward<F>(function));
+            _tasks.enqueue({
+                .counter = get_dummy_counter(),
+                .function = std::forward<F>(function)
+            });
             return;
         }
 
         fiber->reset(std::forward<F>(function));
+        _awaiting_fibers.enqueue(fiber);
+    }
+
+    template <typename traits>
+    template <typename F>
+    void fiber_pool<traits>::push(F&& function, np::counter& counter) noexcept
+    {
+        counter.increase<traits>({});
+
+        np::fiber* fiber;
+        if (!get_free_fiber(fiber))
+        {
+            _tasks.enqueue({
+                .counter = &counter,
+                .function = std::forward<F>(function)
+            });
+            return;
+        }
+
+        fiber->reset(std::forward<F>(function), counter);
         _awaiting_fibers.enqueue(fiber);
     }
 

@@ -88,10 +88,10 @@ namespace np
             {
                 case fiber_status::ended:
                 {
-                    std::function<void()> task;
+                    task_bundle task;
                     if (_tasks.try_dequeue(task))
                     {
-                        fiber->reset(std::move(task));
+                        fiber->reset(std::move(task.function), *task.counter);
                         _awaiting_fibers.enqueue(std::move(fiber));
                     }
                     else
@@ -130,5 +130,10 @@ namespace np
 
         unreachable();
         abort();
+    }
+
+    np::counter* fiber_pool_base::get_dummy_counter() noexcept
+    {
+        return &detail::dummy_counter;
     }
 }

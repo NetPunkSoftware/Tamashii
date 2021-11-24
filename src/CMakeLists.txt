@@ -4,8 +4,12 @@ set(LIB_SOURCES
     core/fiber.cpp
     pool/fiber_pool.hpp
     pool/fiber_pool.cpp
+    synchronization/counter.hpp
+    synchronization/counter.cpp
     synchronization/mutex.hpp
+    synchronization/mutex.cpp
     synchronization/one_way_barrier.hpp
+    synchronization/one_way_barrier.cpp
     synchronization/spinlock.hpp
     utils/badge.hpp)
 
