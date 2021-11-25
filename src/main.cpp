@@ -179,7 +179,7 @@ void main_fiber(np::fiber_pool<>& pool)
 
     np::counter counter;
     global_counter = 0;
-    int max_iters = 20;
+    int max_iters = 200;
     for (int i = 0; i < max_iters; ++i)
     {
         pool.push(&f1_yield, counter);

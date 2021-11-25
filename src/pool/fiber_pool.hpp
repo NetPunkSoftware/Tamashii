@@ -2,6 +2,7 @@
 
 #include "core/fiber.hpp"
 #include "utils/badge.hpp"
+#include "synchronization/spinbarrier.hpp"
 
 #include <concurrentqueue.h>
 
@@ -90,6 +91,7 @@ namespace np
         moodycamel::ConcurrentQueue<np::fiber*> _fibers;
         moodycamel::ConcurrentQueue<np::fiber*> _awaiting_fibers;
         moodycamel::ConcurrentQueue<task_bundle> _tasks;
+        np::spinbarrier _barrier;
     };
 
     template <typename traits = detail::default_fiber_pool_traits>
@@ -166,6 +168,7 @@ namespace np
         _dispatcher_fibers.resize(number_of_threads);
         _thread_ids[0] = std::this_thread::get_id();
         _running = true;
+        _barrier.reset(number_of_threads);
 
         // Execute in other threads
         for (int idx = 1; idx < number_of_threads; ++idx)

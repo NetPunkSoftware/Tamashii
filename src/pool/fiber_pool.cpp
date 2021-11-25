@@ -16,7 +16,8 @@ namespace np
         _running_fibers(),
         _fibers(),
         _awaiting_fibers(),
-        _tasks()
+        _tasks(),
+        _barrier(0)
     {
         detail::fiber_pool_instance = this;
     }
@@ -55,6 +56,9 @@ namespace np
 
         // Thread data
         _thread_ids[idx] = std::this_thread::get_id();
+
+        // Wait for all threads
+        _barrier.wait();
 
         // Keep on getting tasks and running them
         while (_running)

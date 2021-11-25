@@ -13,6 +13,7 @@
 
 
 #if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+#   define NP_DETAIL_USING_FIBER_GUARD_STACK
 #   if !defined(_MSC_VER)
 #		include <sys/mman.h>
 #		include <unistd.h>
@@ -205,6 +206,9 @@ namespace np
     template <typename F>
     fiber::fiber(const char* fiber_name, std::size_t stack_size, F&& function) noexcept :
         _id(current_id++),
+#if !defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
+        _stack_size(stack_size),
+#endif
         _function(std::forward<F>(function)),
         _status(fiber_status::initialized),
         _execution_status(fiber_execution_status::ready),
@@ -212,7 +216,7 @@ namespace np
     {
         plDeclareVirtualThread(_id, fiber_name, _id);
 
-#if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+#if defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
         _stack_size = detail::round_up(stack_size, page_size);
         _stack = detail::aligned_malloc(page_size + _stack_size + page_size, page_size);
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
@@ -220,7 +224,7 @@ namespace np
         detail::memory_guard(_stack, page_size);
         detail::memory_guard(static_cast<char*>(_stack) + page_size + _stack_size, page_size);
 #else
-        _stack = detail::aligned_malloc(_stack_size, page_size);
+        _stack = detail::aligned_malloc(_stack_size, sizeof(uintptr_t));
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
 #endif
     }
@@ -236,7 +240,7 @@ namespace np
     {
         _function = std::forward<F>(function);
         _counter = &counter;
-#if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+#if defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
 #else
         _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);

@@ -12,6 +12,8 @@ set(LIB_SOURCES
     synchronization/mutex.cpp
     synchronization/one_way_barrier.hpp
     synchronization/one_way_barrier.cpp
+    synchronization/spinbarrier.hpp
+    synchronization/spinbarrier.cpp
     synchronization/spinlock.hpp
     utils/badge.hpp)
 

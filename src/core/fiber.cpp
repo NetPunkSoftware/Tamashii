@@ -56,7 +56,7 @@ namespace np
     
     fiber::~fiber() noexcept
     {
-#if defined(NP_GUARD_FIBER_STACK) || !defined(NDEBUG)
+#if defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
         detail::memory_guard_release(_stack, page_size);
         detail::memory_guard_release(static_cast<char*>(_stack) + page_size + _stack_size, page_size);
 #endif
