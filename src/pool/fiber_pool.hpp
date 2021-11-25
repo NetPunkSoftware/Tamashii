@@ -28,6 +28,7 @@ namespace np
     class fiber_pool_base;
     template <typename traits> class fiber_pool;
     class mutex;
+    class one_way_barrier;
 }
 
 
@@ -69,8 +70,8 @@ namespace np
         fiber* this_fiber() noexcept;
         void yield() noexcept;
 
-        inline void block(badge<np::mutex, np::barrier>) noexcept;
-        inline void unblock(badge<np::mutex, np::barrier>, np::fiber* fiber) noexcept;
+        inline void block(badge<np::mutex, np::one_way_barrier, np::barrier>) noexcept;
+        inline void unblock(badge<np::mutex, np::one_way_barrier, np::barrier>, np::fiber* fiber) noexcept;
 
     protected:
         void worker_thread(uint8_t idx) noexcept;
@@ -114,12 +115,12 @@ namespace np
     };
 
 
-    inline void fiber_pool_base::block(badge<np::mutex, np::barrier>) noexcept
+    inline void fiber_pool_base::block(badge<np::mutex, np::one_way_barrier, np::barrier>) noexcept
     {
         block();
     }
 
-    inline void fiber_pool_base::unblock(badge<np::mutex, np::barrier>, np::fiber* fiber) noexcept
+    inline void fiber_pool_base::unblock(badge<np::mutex, np::one_way_barrier, np::barrier>, np::fiber* fiber) noexcept
     {
         unblock(fiber);
     }
@@ -130,7 +131,7 @@ namespace np
     {
         if constexpr (traits::preemtive_fiber_creation)
         {
-            np::fiber** fibers = new np::fiber * [traits::maximum_fibers];
+            np::fiber** fibers = new np::fiber*[traits::maximum_fibers];
             for (uint32_t i = 0; i < traits::maximum_fibers; ++i)
             {
 

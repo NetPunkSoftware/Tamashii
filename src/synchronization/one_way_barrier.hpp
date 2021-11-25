@@ -1,12 +1,12 @@
 #pragma once
 
-#include "synchronization/mutex.hpp"
-
 #include <atomic>
 
 
 namespace np
 {
+	class fiber;
+
 	class one_way_barrier
 	{
 	public:
@@ -18,6 +18,6 @@ namespace np
 
 	private:
 		std::atomic<std::size_t> _size;
-		np::mutex _mutex;
+		std::atomic<np::fiber*> _fiber;
 	};
 }
