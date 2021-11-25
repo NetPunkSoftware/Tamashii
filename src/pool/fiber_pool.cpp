@@ -73,7 +73,7 @@ namespace np
             if (!_awaiting_fibers.try_dequeue(fiber))
             {
                 plScope("Dispatcher cold");
-                
+
 #if defined(NETPUNK_SPINLOCK_PAUSE)
 #if defined(_MSC_VER)
                 _mm_pause();
@@ -102,8 +102,7 @@ namespace np
                     continue;
                 }
 
-                // We had a fiber and a task! 
-                spdlog::critical("ENQUEUED ON {}", fiber->_id);
+                // We had a fiber and a task!
                 fiber->reset(std::move(task.function), *task.counter);
                 _awaiting_fibers.enqueue(std::move(fiber));
                 continue;
@@ -139,7 +138,6 @@ namespace np
                     task_bundle task;
                     if (_tasks.try_dequeue(task))
                     {
-                        spdlog::critical("ENQUEUED ON {}", fiber->_id);
                         fiber->reset(std::move(task.function), *task.counter);
                         _awaiting_fibers.enqueue(std::move(fiber));
                     }

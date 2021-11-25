@@ -197,7 +197,6 @@ namespace np
             return;
         }
 
-        spdlog::critical("ENQUEUED ON {}", fiber->_id);
         fiber->reset(std::forward<F>(function));
         _awaiting_fibers.enqueue(fiber);
     }
@@ -218,7 +217,6 @@ namespace np
             return;
         }
 
-        spdlog::critical("ENQUEUED ON {}", fiber->_id);
         fiber->reset(std::forward<F>(function), counter);
         _awaiting_fibers.enqueue(fiber);
     }
