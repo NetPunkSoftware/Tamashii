@@ -1,44 +1,52 @@
 #include "synchronization/counter.hpp"
-
 #include "pool/fiber_pool.hpp"
 
 
 namespace np
 {
 	counter::counter() noexcept :
-		_waiting(false),
-		_total(0),
-		_done(0)
-	{
-		_mutex.lock();
-	}
+		counter { false }
+	{}
+
+	counter::counter(bool ignore_waiter) noexcept :
+		_ignore_waiter(ignore_waiter),
+        _size(0),
+		_done(0),
+		_fiber(nullptr)
+	{}
 
 	void counter::reset() noexcept
 	{
-		_waiting = false;
-		_total = 0;
-		_done = 0;
-		_mutex.lock();
+		_size = 0;
+        _done = 0;
+		_fiber = nullptr;
 	}
 
-	void counter::done(badge<fiber>) noexcept
+	void counter::done() noexcept
 	{
-		// Wait until someone is waitingn at the counter
-		while (!_waiting.load(std::memory_order_relaxed))
-		{
-			detail::fiber_pool_instance->yield();
-		}
+        if (_ignore_waiter)
+        {
+            ++_done;
+            return;
+        }
 
-		if (++_done == _total)
+        np::fiber* waiter;
+        while (!(waiter = _fiber.load(std::memory_order_relaxed)))
+        {
+            detail::fiber_pool_instance->yield();
+        }
+        
+		if (++_done == _size)
 		{
-			_mutex.unlock();
+			detail::fiber_pool_instance->unblock({}, waiter);
 		}
 	}
 
 	void counter::wait() noexcept
 	{
-		_waiting.store(true, std::memory_order_release);
-		_mutex.lock(); // This suspends the thread until another one calls unlock on the barrier
-		_mutex.unlock();
+		assert(_fiber.load(std::memory_order_relaxed) == nullptr && "Only one fiber can wait on a counter");
+
+		_fiber.store(detail::fiber_pool_instance->this_fiber(), std::memory_order_release);
+		detail::fiber_pool_instance->block({});
 	}
 }

@@ -24,11 +24,11 @@ inline void unreachable() {}
 
 namespace np
 {
-    class counter;
     class fiber;
     class fiber_pool_base;
     template <typename traits> class fiber_pool;
     class mutex;
+    class counter;
     class one_way_barrier;
 }
 
@@ -71,8 +71,8 @@ namespace np
         fiber* this_fiber() noexcept;
         void yield() noexcept;
 
-        inline void block(badge<np::mutex, np::one_way_barrier, np::barrier>) noexcept;
-        inline void unblock(badge<np::mutex, np::one_way_barrier, np::barrier>, np::fiber* fiber) noexcept;
+        inline void block(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>) noexcept;
+        inline void unblock(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>, np::fiber* fiber) noexcept;
 
     protected:
         void worker_thread(uint8_t idx) noexcept;
@@ -117,12 +117,12 @@ namespace np
     };
 
 
-    inline void fiber_pool_base::block(badge<np::mutex, np::one_way_barrier, np::barrier>) noexcept
+    inline void fiber_pool_base::block(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>) noexcept
     {
         block();
     }
 
-    inline void fiber_pool_base::unblock(badge<np::mutex, np::one_way_barrier, np::barrier>, np::fiber* fiber) noexcept
+    inline void fiber_pool_base::unblock(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>, np::fiber* fiber) noexcept
     {
         unblock(fiber);
     }
@@ -197,6 +197,7 @@ namespace np
             return;
         }
 
+        spdlog::critical("ENQUEUED ON {}", fiber->_id);
         fiber->reset(std::forward<F>(function));
         _awaiting_fibers.enqueue(fiber);
     }
@@ -217,6 +218,7 @@ namespace np
             return;
         }
 
+        spdlog::critical("ENQUEUED ON {}", fiber->_id);
         fiber->reset(std::forward<F>(function), counter);
         _awaiting_fibers.enqueue(fiber);
     }

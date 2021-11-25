@@ -167,6 +167,8 @@ void f3_one_way_barrier(np::one_way_barrier* one_way_barrier)
 
 void main_fiber(np::fiber_pool<>& pool)
 {
+    plScope("Main");
+    
     np::one_way_barrier one_way_barrier(3);
     pool.push([&one_way_barrier]() { f1_one_way_barrier(&one_way_barrier); });
     pool.push([&one_way_barrier]() { f2_one_way_barrier(&one_way_barrier); });

@@ -53,6 +53,7 @@ namespace np
     void fiber_pool_base::worker_thread(uint8_t idx) noexcept
     {
         plDeclareThreadDyn("Workers/%d", idx);
+        plAttachVirtualThread(_dispatcher_fibers[idx]->_id);
 
         // Thread data
         _thread_ids[idx] = std::this_thread::get_id();
@@ -63,7 +64,7 @@ namespace np
         // Keep on getting tasks and running them
         while (_running)
         {
-            plBegin("Dispatcher loop");
+            plScope("Dispatcher loop");
 
             // Temporal to hold an enqueued fiber
             np::fiber* fiber;
@@ -71,6 +72,8 @@ namespace np
             // Get a free fiber from the pool
             if (!_awaiting_fibers.try_dequeue(fiber))
             {
+                plScope("Dispatcher cold");
+                
 #if defined(NETPUNK_SPINLOCK_PAUSE)
 #if defined(_MSC_VER)
                 _mm_pause();
@@ -78,8 +81,31 @@ namespace np
                 __builtin_ia32_pause();
 #endif
 #endif // NETPUNK_SPINLOCK_PAUSE
-                // TODO(gpascualg): Check for tasks and empty fibers!
-                plEnd("Dispatcher loop");
+
+                // Try to get a new task without assigned fiber
+                // But first try an early out
+                if (_tasks.size_approx() == 0)
+                {
+                    continue;
+                }
+
+                // Enqueueing and dequeueing a fiber is easier than a task, go that way
+                if (!_fibers.try_dequeue(fiber))
+                {
+                    continue;
+                }
+
+                task_bundle task;
+                if (!_tasks.try_dequeue(task))
+                {
+                    _fibers.enqueue(fiber);
+                    continue;
+                }
+
+                // We had a fiber and a task! 
+                spdlog::critical("ENQUEUED ON {}", fiber->_id);
+                fiber->reset(std::move(task.function), *task.counter);
+                _awaiting_fibers.enqueue(std::move(fiber));
                 continue;
             }
 
@@ -88,18 +114,20 @@ namespace np
             if (fiber->execution_status({}) != fiber_execution_status::ready)
             {
                 _awaiting_fibers.enqueue(fiber);
-                plEnd("Dispatcher loop");
                 continue;
             }
 
             spdlog::debug("[{}] FIBER {}/{} EXECUTE", idx, fiber->_id, fiber->status());
-            plAttachVirtualThread(fiber->_id);
 
             // Change execution context
-            //plBegin("Fiber execution");
+            plBegin("Fiber execution");
             fiber->execution_status({}, fiber_execution_status::executing);
             _running_fibers[idx] = fiber;
+
+            plAttachVirtualThread(fiber->_id);
             _dispatcher_fibers[idx]->resume(fiber);
+            plAttachVirtualThread(_dispatcher_fibers[idx]->_id);
+
             spdlog::debug("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
 
             // Push fiber back
@@ -111,6 +139,7 @@ namespace np
                     task_bundle task;
                     if (_tasks.try_dequeue(task))
                     {
+                        spdlog::critical("ENQUEUED ON {}", fiber->_id);
                         fiber->reset(std::move(task.function), *task.counter);
                         _awaiting_fibers.enqueue(std::move(fiber));
                     }
@@ -140,8 +169,7 @@ namespace np
             }
 
             fiber->execution_status({}, fiber_execution_status::ready);
-            //plEnd("Fiber execution");
-            plEnd("Dispatcher loop");
+            plEnd("Fiber execution");
         }
     }
 

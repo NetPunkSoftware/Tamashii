@@ -1,6 +1,7 @@
 #pragma once
 
 #include "synchronization/counter.hpp"
+#include "utils/badge.hpp"
 
 #include <boost/context/fiber_fcontext.hpp>
 #include <boost/context/detail/fcontext.hpp>
@@ -96,6 +97,7 @@ namespace np
 #endif // _MSC_VER
         }
 
+#if defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
         inline void memory_guard(void* addr, std::size_t len)
         {
 #ifdef _MSC_VER
@@ -115,8 +117,9 @@ namespace np
             mprotect(addr, len, PROT_READ | PROT_WRITE);
 #endif // _MSC_VER
         }
+#endif
 
-        inline counter dummy_counter{};
+        inline np::counter dummy_counter(true);
 
         struct record
         {
@@ -132,7 +135,7 @@ namespace np
         friend inline boost::context::detail::transfer_t detail::builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
         friend inline void detail::builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
 
-        static inline uint32_t current_id = 0;
+        static inline uint32_t current_id = 10000;
         static inline std::size_t page_size = detail::page_size();
 
     public:
@@ -186,7 +189,7 @@ namespace np
         boost::context::detail::fcontext_t _ctx;
         std::function<void()> _function;
         fiber_status _status;
-        fiber_execution_status _execution_status;
+        std::atomic<fiber_execution_status> _execution_status;
 
         // Fiber switching
         np::counter* _counter;
@@ -306,12 +309,12 @@ namespace np
 
     inline void fiber::execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept
     {
-        _execution_status = status;
+        _execution_status.store(status, std::memory_order_acq_rel);
     }
 
     inline fiber_execution_status fiber::execution_status(badge<fiber_pool_base>) noexcept
     {
-        return _execution_status;
+        return _execution_status.load(std::memory_order_relaxed);
     }
 
     inline void fiber::execute() noexcept

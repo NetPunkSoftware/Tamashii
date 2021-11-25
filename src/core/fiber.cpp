@@ -39,7 +39,7 @@ namespace np
 	    std::swap(_ctx, other._ctx);
 	    std::swap(_function, other._function);
         std::swap(_status, other._status);
-        std::swap(_execution_status, other._execution_status);
+        _execution_status = other._execution_status.load(std::memory_order_release); // TODO(gpascualg): Mem order
     }
 
     fiber& fiber::operator=(fiber&& other) noexcept
@@ -50,7 +50,7 @@ namespace np
         std::swap(_ctx, other._ctx);
         std::swap(_function, other._function);
         std::swap(_status, other._status);
-        std::swap(_execution_status, other._execution_status);
+        _execution_status = other._execution_status.load(std::memory_order_release); // TODO(gpascualg): Mem order
         return *this;
     }
     
