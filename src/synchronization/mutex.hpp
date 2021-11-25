@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utils/badge.hpp"
+
 #include <atomic>
 #include <chrono>
 
@@ -8,6 +10,7 @@
 
 namespace np
 {
+    class barrier;
     class fiber;
 }
 

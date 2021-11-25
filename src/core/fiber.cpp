@@ -38,15 +38,19 @@ namespace np
 	    std::swap(_stack_size, other._stack_size);
 	    std::swap(_ctx, other._ctx);
 	    std::swap(_function, other._function);
+        std::swap(_status, other._status);
+        std::swap(_execution_status, other._execution_status);
     }
 
     fiber& fiber::operator=(fiber&& other) noexcept
     {
         std::swap(_id, other._id);
         std::swap(_stack, other._stack);
-	    std::swap(_stack_size, other._stack_size);
-	    std::swap(_ctx, other._ctx);
-	    std::swap(_function, other._function);
+        std::swap(_stack_size, other._stack_size);
+        std::swap(_ctx, other._ctx);
+        std::swap(_function, other._function);
+        std::swap(_status, other._status);
+        std::swap(_execution_status, other._execution_status);
         return *this;
     }
     

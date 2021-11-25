@@ -1,10 +1,19 @@
 #pragma once
 
+#include <type_traits>
+#include <tuple>
 
-template <typename T>
+#undef min
+
+#include <boost/preprocessor/repetition/repeat.hpp>
+
+
+#define VARIADIC_FRIENDS(z, N, Ts) friend std::tuple_element_t<std::min((std::size_t)N+1, sizeof...(Ts)), std::tuple<void, Ts...>>;
+
+template <typename... T>
 class badge
 {
-	friend T;
+	BOOST_PP_REPEAT(128, VARIADIC_FRIENDS, T)
 
 private:
 	badge() = default;

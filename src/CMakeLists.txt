@@ -4,6 +4,8 @@ set(LIB_SOURCES
     core/fiber.cpp
     pool/fiber_pool.hpp
     pool/fiber_pool.cpp
+    synchronization/barrier.hpp
+    synchronization/barrier.cpp
     synchronization/counter.hpp
     synchronization/counter.cpp
     synchronization/mutex.hpp
@@ -31,4 +33,5 @@ endif()
 
 # EXECUTABLE
 add_executable(fibers_test main.cpp)
+target_compile_features(fibers_test PUBLIC cxx_std_20)
 target_link_libraries(fibers_test PRIVATE fibers)

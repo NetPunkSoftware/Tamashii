@@ -26,6 +26,7 @@
 namespace np
 {
     class fiber;
+    class fiber_pool_base;
 
     struct empty_fiber_t
     {};
@@ -38,6 +39,12 @@ namespace np
         ended,
         yielded,
         blocked
+    };
+
+    enum class fiber_execution_status : uint8_t
+    {
+        executing,
+        ready
     };
 
     namespace detail
@@ -163,6 +170,9 @@ namespace np
 
         inline fiber_status status() const noexcept;
         inline np::counter* counter() noexcept;
+        
+        inline void execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept;
+        inline fiber_execution_status execution_status(badge<fiber_pool_base>) noexcept;
 
     private:
         void yield_blocking(fiber* to) noexcept;
@@ -175,6 +185,7 @@ namespace np
         boost::context::detail::fcontext_t _ctx;
         std::function<void()> _function;
         fiber_status _status;
+        fiber_execution_status _execution_status;
 
         // Fiber switching
         np::counter* _counter;
@@ -187,7 +198,7 @@ namespace np
     {}
 
     template <typename F>
-    fiber::fiber(std::size_t stack_size, F && function) noexcept :
+    fiber::fiber(std::size_t stack_size, F&& function) noexcept :
         fiber{ "Fibers/%d", stack_size, std::forward<F>(function) }
     {}
 
@@ -196,6 +207,7 @@ namespace np
         _id(current_id++),
         _function(std::forward<F>(function)),
         _status(fiber_status::initialized),
+        _execution_status(fiber_execution_status::ready),
         _counter(&detail::dummy_counter)
     {
         plDeclareVirtualThread(_id, fiber_name, _id);
@@ -287,7 +299,17 @@ namespace np
     {
         return _counter;
     }
-    
+
+    inline void fiber::execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept
+    {
+        _execution_status = status;
+    }
+
+    inline fiber_execution_status fiber::execution_status(badge<fiber_pool_base>) noexcept
+    {
+        return _execution_status;
+    }
+
     inline void fiber::execute() noexcept
     {
         _function();

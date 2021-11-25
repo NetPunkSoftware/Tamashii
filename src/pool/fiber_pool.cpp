@@ -35,7 +35,7 @@ namespace np
         fiber->yield(dispatcher);
     }
 
-    void fiber_pool_base::block(badge<np::mutex>) noexcept
+    void fiber_pool_base::block() noexcept
     {
         auto index = thread_index();
         auto fiber = _running_fibers[index];
@@ -44,7 +44,7 @@ namespace np
         fiber->yield_blocking(dispatcher);
     }
 
-    void fiber_pool_base::unblock(badge<np::mutex>, np::fiber* fiber) noexcept
+    void fiber_pool_base::unblock(np::fiber* fiber) noexcept
     {
         _awaiting_fibers.enqueue(fiber);
     }
@@ -59,6 +59,8 @@ namespace np
         // Keep on getting tasks and running them
         while (_running)
         {
+            plBegin("Dispatcher loop");
+
             // Temporal to hold an enqueued fiber
             np::fiber* fiber;
 
@@ -72,6 +74,17 @@ namespace np
                 __builtin_ia32_pause();
 #endif
 #endif // NETPUNK_SPINLOCK_PAUSE
+                // TODO(gpascualg): Check for tasks and empty fibers!
+                plEnd("Dispatcher loop");
+                continue;
+            }
+
+            // Maybe this fiber is yet in the process of yielding, we don't want to execute it if
+            //  that is the case
+            if (fiber->execution_status({}) != fiber_execution_status::ready)
+            {
+                _awaiting_fibers.enqueue(fiber);
+                plEnd("Dispatcher loop");
                 continue;
             }
 
@@ -79,6 +92,8 @@ namespace np
             plAttachVirtualThread(fiber->_id);
 
             // Change execution context
+            //plBegin("Fiber execution");
+            fiber->execution_status({}, fiber_execution_status::executing);
             _running_fibers[idx] = fiber;
             _dispatcher_fibers[idx]->resume(fiber);
             spdlog::debug("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
@@ -88,6 +103,7 @@ namespace np
             {
                 case fiber_status::ended:
                 {
+                    plBegin("Dispatcher pop task");
                     task_bundle task;
                     if (_tasks.try_dequeue(task))
                     {
@@ -98,11 +114,14 @@ namespace np
                     {
                         _fibers.enqueue(std::move(fiber));
                     }
+                    plEnd("Dispatcher pop task");
                 }
                 break;
 
                 case fiber_status::yielded:
+                    plBegin("Dispatcher push awaiting");
                     _awaiting_fibers.enqueue(std::move(fiber));
+                    plEnd("Dispatcher push awaiting");
                     break;
 
                 case fiber_status::blocked:
@@ -115,6 +134,10 @@ namespace np
                     abort();
                     break;
             }
+
+            fiber->execution_status({}, fiber_execution_status::ready);
+            //plEnd("Fiber execution");
+            plEnd("Dispatcher loop");
         }
     }
 

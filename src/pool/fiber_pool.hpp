@@ -69,12 +69,15 @@ namespace np
         fiber* this_fiber() noexcept;
         void yield() noexcept;
 
-        void block(badge<np::mutex>) noexcept;
-        void unblock(badge<np::mutex>, np::fiber* fiber) noexcept;
+        inline void block(badge<np::mutex, np::barrier>) noexcept;
+        inline void unblock(badge<np::mutex, np::barrier>, np::fiber* fiber) noexcept;
 
     protected:
         void worker_thread(uint8_t idx) noexcept;
         np::counter* get_dummy_counter() noexcept;
+
+        void block() noexcept;
+        void unblock(np::fiber* fiber) noexcept;
 
     protected:
         bool _running;
@@ -110,6 +113,16 @@ namespace np
         bool get_free_fiber(np::fiber*& fiber) noexcept;
     };
 
+
+    inline void fiber_pool_base::block(badge<np::mutex, np::barrier>) noexcept
+    {
+        block();
+    }
+
+    inline void fiber_pool_base::unblock(badge<np::mutex, np::barrier>, np::fiber* fiber) noexcept
+    {
+        unblock(fiber);
+    }
 
     template <typename traits>
     fiber_pool<traits>::fiber_pool() noexcept :
