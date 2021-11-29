@@ -3,6 +3,41 @@
 
 namespace np
 {
+    namespace detail
+    {
+#if defined(_MSC_VER)
+        // Windows fucks up with the registers when calling the on-top function
+        //  which means the entrypoint won't receive the same transfer as the on-top function
+        // In fact, it receives null, completely fucking up the call
+
+        // Thus, we manually make a naked function (as x64 has inline asm disabled)
+        static uint8_t naked_resume[] = {
+            // RAX = reinterpret_cast<detail::record*>(transfer.data)
+            0x48, 0x8b, 0x41, 0x08,     // mov    rax,QWORD PTR[rcx + 0x8]
+            // RAX = record->former
+            0x48, 0x8b, 0x00,           // mov    rax,QWORD PTR[rax]
+            // R9 = transfer.fctx
+            0x4c, 0x8b, 0x09,           // mov    r9,QWORD PTR[rcx]
+            // RAX->_ctx = R9
+            0x4c, 0x89, 0x48, 0x18,     // mov    QWORD PTR[rax + 0x18],r9
+            // Done
+            0xC3                        // ret
+        };
+
+        // Alloc memory only once, copy the bytes, and then point to it
+        using call_fn = boost::context::detail::transfer_t(*)(boost::context::detail::transfer_t);
+        void* naked_resume_ptr = ([]() {
+            void* resume_ptr = VirtualAlloc(nullptr, sizeof(naked_resume), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+            assert(resume_ptr != nullptr && "Could not alloc memory for fiber naked resume");
+            std::memcpy(resume_ptr, naked_resume, sizeof(naked_resume));
+            return resume_ptr;
+        })();
+#endif
+    }
+}
+
+namespace np
+{
     fiber::fiber() noexcept :
         fiber { "Fibers/%d" }
     {}
