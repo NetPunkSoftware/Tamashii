@@ -29,6 +29,7 @@ namespace np
     template <typename traits> class fiber_pool;
     class mutex;
     class counter;
+    class condition_variable;
     class one_way_barrier;
 }
 
@@ -71,8 +72,10 @@ namespace np
         fiber* this_fiber() noexcept;
         void yield() noexcept;
 
-        inline void block(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>) noexcept;
-        inline void unblock(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>, np::fiber* fiber) noexcept;
+        using protected_access_t = badge<np::mutex, np::one_way_barrier, np::barrier, np::counter, condition_variable>;
+
+        inline void block(protected_access_t) noexcept;
+        inline void unblock(protected_access_t, np::fiber* fiber) noexcept;
 
     protected:
         void worker_thread(uint8_t idx) noexcept;
@@ -117,12 +120,12 @@ namespace np
     };
 
 
-    inline void fiber_pool_base::block(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>) noexcept
+    inline void fiber_pool_base::block(protected_access_t) noexcept
     {
         block();
     }
 
-    inline void fiber_pool_base::unblock(badge<np::mutex, np::one_way_barrier, np::barrier, np::counter>, np::fiber* fiber) noexcept
+    inline void fiber_pool_base::unblock(protected_access_t, np::fiber* fiber) noexcept
     {
         unblock(fiber);
     }

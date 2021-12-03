@@ -6,6 +6,10 @@ set(LIB_SOURCES
     pool/fiber_pool.cpp
     synchronization/barrier.hpp
     synchronization/barrier.cpp
+    synchronization/channel.hpp
+    synchronization/channel.cpp
+    synchronization/condition_variable.hpp
+    synchronization/condition_variable.cpp
     synchronization/counter.hpp
     synchronization/counter.cpp
     synchronization/mutex.hpp
