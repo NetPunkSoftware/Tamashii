@@ -12,6 +12,8 @@ set(LIB_SOURCES
     synchronization/condition_variable.cpp
     synchronization/counter.hpp
     synchronization/counter.cpp
+    synchronization/event.hpp
+    synchronization/event.cpp
     synchronization/mutex.hpp
     synchronization/mutex.cpp
     synchronization/one_way_barrier.hpp

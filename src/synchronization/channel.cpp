@@ -4,7 +4,7 @@
 namespace np
 {
 	channel::channel() noexcept :
-		_cv(),
+		_ev(),
 		_mutex(),
 		_running(false),
 		_pending(0),
@@ -24,7 +24,7 @@ namespace np
 			//	so there is no worries that someone could beat us and decrease _pending
 			if (_pending == 0)
 			{
-				_cv.wait(_mutex);
+				_ev.wait(_mutex);
 			}
 			_mutex.unlock();
 

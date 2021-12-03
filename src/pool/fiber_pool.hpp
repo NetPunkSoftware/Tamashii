@@ -31,6 +31,7 @@ namespace np
     class counter;
     class condition_variable;
     class one_way_barrier;
+    class event;
 }
 
 
@@ -72,7 +73,7 @@ namespace np
         fiber* this_fiber() noexcept;
         void yield() noexcept;
 
-        using protected_access_t = badge<np::mutex, np::one_way_barrier, np::barrier, np::counter, condition_variable>;
+        using protected_access_t = badge<np::mutex, np::one_way_barrier, np::barrier, np::counter, condition_variable, event>;
 
         inline void block(protected_access_t) noexcept;
         inline void unblock(protected_access_t, np::fiber* fiber) noexcept;

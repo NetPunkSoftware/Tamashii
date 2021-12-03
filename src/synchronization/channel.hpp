@@ -1,6 +1,6 @@
 #pragma once
 
-#include "synchronization/condition_variable.hpp"
+#include "synchronization/event.hpp"
 #include "synchronization/mutex.hpp"
 
 #include <functional>
@@ -20,7 +20,7 @@ namespace np
 		inline void stop() noexcept;
 
 	private:
-		np::condition_variable _cv;
+		np::event _ev;
 		np::mutex _mutex;
 
 		bool _running;
@@ -35,7 +35,7 @@ namespace np
 		_jobs.enqueue(std::forward<F>(fnc));
 		_mutex.lock();
 		++_pending;
-		_cv.notify_one(); // There can only be one fiber waiting, the consumer
+		_ev.notify();
 		_mutex.unlock();
 	}
 
