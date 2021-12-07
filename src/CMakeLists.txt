@@ -2,14 +2,17 @@ set(LIB_SOURCES
     container/spmc_queue.hpp
     core/fiber.hpp
     core/fiber.cpp
+    ext/channel.hpp
+    ext/executor.hpp
+    ext/executor.cpp
+    ext/fiber_scmp.hpp
+    ext/thread_scmp.hpp
     local/fiber_local.hpp
     local/thread_local.hpp
     pool/fiber_pool.hpp
     pool/fiber_pool.cpp
     synchronization/barrier.hpp
     synchronization/barrier.cpp
-    synchronization/channel.hpp
-    synchronization/channel.cpp
     synchronization/condition_variable.hpp
     synchronization/condition_variable.cpp
     synchronization/counter.hpp

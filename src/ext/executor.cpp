@@ -1,9 +1,9 @@
-#include "synchronization/channel.hpp"
+#include "ext/executor.hpp"
 
 
 namespace np
 {
-	channel::channel() noexcept :
+	executor::executor() noexcept :
 		_ev(),
 		_mutex(),
 		_running(false),
@@ -11,7 +11,7 @@ namespace np
 		_jobs()
 	{}
 
-	void channel::start() noexcept
+	void executor::start() noexcept
 	{
 		assert(!_running && "Only one fiber can be a consumer");
 		_running = true;
@@ -33,6 +33,7 @@ namespace np
 			while (_jobs.try_dequeue(fnc))
 			{
 				fnc();
+				--_pending;
 			}
 		}
 	}

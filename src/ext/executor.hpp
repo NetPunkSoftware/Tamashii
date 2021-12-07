@@ -8,10 +8,10 @@
 
 namespace np
 {
-	class channel
+	class executor
 	{
 	public:
-		channel() noexcept;
+		executor() noexcept;
 
 		template <typename F>
 		void push(F&& fnc) noexcept;
@@ -30,7 +30,7 @@ namespace np
 
 
 	template <typename F>
-	void channel::push(F&& fnc) noexcept
+	void executor::push(F&& fnc) noexcept
 	{
 		_jobs.enqueue(std::forward<F>(fnc));
 		_mutex.lock();
@@ -39,7 +39,7 @@ namespace np
 		_mutex.unlock();
 	}
 
-	inline void channel::stop() noexcept
+	inline void executor::stop() noexcept
 	{
 		_running = false;
 	}
