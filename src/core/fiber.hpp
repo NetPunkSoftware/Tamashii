@@ -182,6 +182,7 @@ namespace np
         inline fiber_status status() const noexcept;
         inline np::counter* counter() noexcept;
         
+        inline uint32_t id() const noexcept;
         inline void execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept;
         inline fiber_execution_status execution_status(badge<fiber_pool_base>) noexcept;
 
@@ -285,6 +286,11 @@ namespace np
     inline np::counter* fiber::counter() noexcept
     {
         return _counter;
+    }
+
+    inline uint32_t fiber::id() const noexcept
+    {
+        return _id;
     }
 
     inline void fiber::execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept

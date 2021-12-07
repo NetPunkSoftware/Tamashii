@@ -2,6 +2,8 @@ set(LIB_SOURCES
     container/spmc_queue.hpp
     core/fiber.hpp
     core/fiber.cpp
+    local/fiber_local.hpp
+    local/thread_local.hpp
     pool/fiber_pool.hpp
     pool/fiber_pool.cpp
     synchronization/barrier.hpp

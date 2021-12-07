@@ -7,11 +7,13 @@ namespace np
 {
 	barrier::barrier(std::size_t size) noexcept :
 		_size(size),
-		_waiting(size)
+		_waiting(size),
+		_waiting_fibers()
 	{}
 
 	void barrier::reset(std::size_t size) noexcept
 	{
+		assert(_waiting_fibers.size_approx() == 0 && "Can not reset while there are waiting fibers");
 		_size = size;
 		_waiting = size;
 	}

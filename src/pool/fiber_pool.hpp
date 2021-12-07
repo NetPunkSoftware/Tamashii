@@ -77,6 +77,8 @@ namespace np
 
         inline void block(protected_access_t) noexcept;
         inline void unblock(protected_access_t, np::fiber* fiber) noexcept;
+        inline uint16_t number_of_threads() const noexcept;
+        inline uint32_t target_number_of_fibers() const noexcept;
 
     protected:
         void worker_thread(uint8_t idx) noexcept;
@@ -87,7 +89,9 @@ namespace np
 
     protected:
         bool _running;
+        uint16_t _number_of_threads;
         uint32_t _number_of_spawned_fibers;
+        uint32_t _target_number_of_fibers;
         std::vector<std::thread> _worker_threads;
         std::vector<std::thread::id> _thread_ids;
         std::vector<np::fiber*> _dispatcher_fibers;
@@ -131,6 +135,16 @@ namespace np
         unblock(fiber);
     }
 
+    inline uint16_t fiber_pool_base::number_of_threads() const noexcept
+    {
+        return _number_of_threads;
+    }
+
+    inline uint32_t fiber_pool_base::target_number_of_fibers() const noexcept
+    {
+        return _target_number_of_fibers;
+    }
+
     template <typename traits>
     fiber_pool<traits>::fiber_pool() noexcept :
         fiber_pool_base()
@@ -167,6 +181,8 @@ namespace np
             number_of_threads = std::thread::hardware_concurrency();
         }
 
+        _number_of_threads = number_of_threads;
+        _target_number_of_fibers = traits::maximum_fibers;
         _thread_ids.resize(number_of_threads);
         _running_fibers.resize(number_of_threads);
         _dispatcher_fibers.resize(number_of_threads);
