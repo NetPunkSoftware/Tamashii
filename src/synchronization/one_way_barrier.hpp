@@ -5,7 +5,7 @@
 
 namespace np
 {
-	class fiber;
+	class fiber_base;
 
 	class one_way_barrier
 	{
@@ -18,6 +18,6 @@ namespace np
 
 	private:
 		std::atomic<std::size_t> _size;
-		std::atomic<np::fiber*> _fiber;
+		std::atomic<np::fiber_base*> _fiber;
 	};
 }

@@ -19,7 +19,7 @@ namespace np
 	{
 		if (--_size == 0)
 		{
-			np::fiber* waiter;
+			np::fiber_base* waiter;
 			while (!(waiter = _fiber.load(std::memory_order_relaxed)))
 			{
 				detail::fiber_pool_instance->yield();

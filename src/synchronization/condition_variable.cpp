@@ -8,7 +8,7 @@ namespace np
 	{
 		assert(detail::fiber_pool_instance != nullptr && "Conditions variable require a fiber pool");
 
-		np::fiber* fiber;
+		np::fiber_base* fiber;
 		if (_waiting_fibers.try_dequeue(fiber))
 		{
 			np::detail::fiber_pool_instance->unblock({}, fiber);
@@ -19,7 +19,7 @@ namespace np
 	{
 		assert(detail::fiber_pool_instance != nullptr && "Conditions variable require a fiber pool");
 
-		np::fiber* fiber;
+		np::fiber_base* fiber;
 		while (_waiting_fibers.try_dequeue(fiber))
 		{
 			np::detail::fiber_pool_instance->unblock({}, fiber);

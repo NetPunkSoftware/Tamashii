@@ -66,3 +66,30 @@ if(NOT spdlog_POPULATED)
 endif()
 
 target_link_libraries(fibers PUBLIC spdlog)
+
+
+
+####################################################################################
+# SG14 implementations
+FetchContent_Declare(
+    sg14
+    GIT_REPOSITORY https://github.com/WG21-SG14/SG14
+    GIT_TAG        5296fff6d507a962b5a81bf5f3731aeac0ea9391
+)
+
+FetchContent_GetProperties(sg14)
+if(NOT sg14_POPULATED)
+    FetchContent_Populate(sg14)
+    add_subdirectory(${sg14_SOURCE_DIR} ${sg14_BINARY_DIR})
+endif()
+
+target_link_libraries(fibers PUBLIC sg14)
+
+
+
+
+
+
+
+
+

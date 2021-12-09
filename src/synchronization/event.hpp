@@ -5,7 +5,7 @@
 
 namespace np
 {
-	class fiber;
+	class fiber_base;
 	class mutex;
 
 	class event
@@ -17,6 +17,6 @@ namespace np
 		void wait(np::mutex& mutex) noexcept;
 
 	private:
-		np::fiber* _awaiter;
+		np::fiber_base* _awaiter;
 	};
 }

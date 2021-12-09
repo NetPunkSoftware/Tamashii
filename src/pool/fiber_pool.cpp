@@ -22,7 +22,7 @@ namespace np
         detail::fiber_pool_instance = this;
     }
 
-    fiber* fiber_pool_base::this_fiber() noexcept
+    fiber_base* fiber_pool_base::this_fiber() noexcept
     {
         return _running_fibers[thread_index()];
     }
@@ -45,130 +45,9 @@ namespace np
         fiber->yield_blocking(dispatcher);
     }
 
-    void fiber_pool_base::unblock(np::fiber* fiber) noexcept
+    void fiber_pool_base::unblock(np::fiber_base* fiber) noexcept
     {
         _awaiting_fibers.enqueue(fiber);
-    }
-
-    void fiber_pool_base::worker_thread(uint8_t idx) noexcept
-    {
-        plDeclareThreadDyn("Workers/%d", idx);
-        plAttachVirtualThread(_dispatcher_fibers[idx]->_id);
-
-        // Thread data
-        _thread_ids[idx] = std::this_thread::get_id();
-
-        // Wait for all threads
-        _barrier.wait();
-
-        // Keep on getting tasks and running them
-        while (_running)
-        {
-            plScope("Dispatcher loop");
-
-            // Temporal to hold an enqueued fiber
-            np::fiber* fiber;
-
-            // Get a free fiber from the pool
-            if (!_awaiting_fibers.try_dequeue(fiber))
-            {
-                plScope("Dispatcher cold");
-
-#if defined(NETPUNK_SPINLOCK_PAUSE)
-#if defined(_MSC_VER)
-                _mm_pause();
-#else
-                __builtin_ia32_pause();
-#endif
-#endif // NETPUNK_SPINLOCK_PAUSE
-
-                // Try to get a new task without assigned fiber
-                // But first try an early out
-                if (_tasks.size_approx() == 0)
-                {
-                    continue;
-                }
-
-                // Enqueueing and dequeueing a fiber is easier than a task, go that way
-                if (!_fibers.try_dequeue(fiber))
-                {
-                    continue;
-                }
-
-                task_bundle task;
-                if (!_tasks.try_dequeue(task))
-                {
-                    _fibers.enqueue(fiber);
-                    continue;
-                }
-
-                // We had a fiber and a task!
-                fiber->reset(std::move(task.function), *task.counter);
-                _awaiting_fibers.enqueue(std::move(fiber));
-                continue;
-            }
-
-            // Maybe this fiber is yet in the process of yielding, we don't want to execute it if
-            //  that is the case
-            if (fiber->execution_status({}) != fiber_execution_status::ready)
-            {
-                _awaiting_fibers.enqueue(fiber);
-                continue;
-            }
-
-            spdlog::debug("[{}] FIBER {}/{} EXECUTE", idx, fiber->_id, fiber->status());
-
-            // Change execution context
-            plBegin("Fiber execution");
-            fiber->execution_status({}, fiber_execution_status::executing);
-            _running_fibers[idx] = fiber;
-
-            plAttachVirtualThread(fiber->_id);
-            _dispatcher_fibers[idx]->resume(fiber);
-            plAttachVirtualThread(_dispatcher_fibers[idx]->_id);
-
-            spdlog::debug("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
-
-            // Push fiber back
-            switch (fiber->status())
-            {
-                case fiber_status::ended:
-                {
-                    plBegin("Dispatcher pop task");
-                    task_bundle task;
-                    if (_tasks.try_dequeue(task))
-                    {
-                        fiber->reset(std::move(task.function), *task.counter);
-                        _awaiting_fibers.enqueue(std::move(fiber));
-                    }
-                    else
-                    {
-                        _fibers.enqueue(std::move(fiber));
-                    }
-                    plEnd("Dispatcher pop task");
-                }
-                break;
-
-                case fiber_status::yielded:
-                    plBegin("Dispatcher push awaiting");
-                    _awaiting_fibers.enqueue(std::move(fiber));
-                    plEnd("Dispatcher push awaiting");
-                    break;
-
-                case fiber_status::blocked:
-                    // Do nothing, the mutex will already hold a reference to the fiber
-                    break;
-
-                default:
-                    assert(false && "Fiber ended with unexpected status");
-                    unreachable();
-                    abort();
-                    break;
-            }
-
-            fiber->execution_status({}, fiber_execution_status::ready);
-            plEnd("Fiber execution");
-        }
     }
 
     uint8_t fiber_pool_base::thread_index() const noexcept

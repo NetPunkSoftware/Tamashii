@@ -3,7 +3,7 @@
 
 #include "core/fiber.hpp"
 #include "pool/fiber_pool.hpp"
-#include "synchronization/channel.hpp"
+#include "ext/executor.hpp"
 #include "synchronization/mutex.hpp"
 #include "synchronization/one_way_barrier.hpp"
 #include "synchronization/spinlock.hpp"
@@ -33,13 +33,6 @@ void f3()
     global_counter++;
 }
 
-void f_resumable(np::fiber* fiber)
-{
-    spdlog::trace("EARLY");
-    fiber->yield();
-    spdlog::trace("LATE");
-}
-
 std::atomic<uint32_t> per_thread_count[12] = {
     0, 0, 0, 0,
     0, 0, 0, 0,
@@ -54,8 +47,8 @@ inline int fib(int n) noexcept
     return fib(n - 1) + fib(n - 2);
 }
 
-np::channel channel;
-uint32_t channel_count;
+np::executor executor;
+uint32_t executor_count;
 
 void f1_yield()
 {
@@ -67,7 +60,7 @@ void f1_yield()
     plEnd("F1 EARLY");
     np::this_fiber::yield();
 
-    channel.push([] { ++channel_count; });
+    executor.push([] { ++executor_count; });
 
     global_counter++;
     per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
@@ -86,7 +79,7 @@ void f2_yield()
     plEnd("F2 EARLY");
     np::this_fiber::yield();
 
-    channel.push([] { ++channel_count; });
+    executor.push([] { ++executor_count; });
 
     global_counter++;
     per_thread_count[np::detail::fiber_pool_instance->thread_index()]++;
@@ -201,14 +194,14 @@ void main_fiber(np::fiber_pool<>& pool)
     assert(global_counter == max_iters * 2);
     spdlog::critical("DONE");
 
-    assert(channel_count == 0);
+    assert(executor_count == 0);
 
     counter.reset();
-    pool.push([] { channel.start(); }, counter);
-    pool.push([] { channel.push([] { channel.stop(); }); });
+    pool.push([] { executor.start(); }, counter);
+    pool.push([] { executor.push([] { executor.stop(); }); });
     counter.wait();
 
-    assert(channel_count == max_iters * 2);
+    assert(executor_count == max_iters * 2);
 
     pool.end();
 }
@@ -229,3 +222,32 @@ int main()
 
     return 0;
 }
+
+//
+//#define PL_IMPLEMENTATION 1
+//#include <palanteer.h>
+//
+//#include "core/fiber.hpp"
+//
+//#include <spdlog/spdlog.h>
+//
+//#include <iostream>
+//
+//void f1()
+//{
+//    spdlog::critical("F1");
+//}
+//void f2()
+//{
+//    spdlog::critical("F2");
+//}
+//
+//int main()
+//{
+//    np::fiber<> main;
+//    np::fiber<> f1_fiber(&f1);
+//    np::fiber<> f2_fiber(&f2);
+//
+//    main.resume(&f1_fiber);
+//    main.resume(&f2_fiber);
+//}

@@ -18,6 +18,6 @@ namespace np
 	private:
 		std::size_t _size;
 		std::atomic<std::size_t> _waiting;
-		moodycamel::ConcurrentQueue<np::fiber*> _waiting_fibers;
+		moodycamel::ConcurrentQueue<np::fiber_base*> _waiting_fibers;
 	};
 }

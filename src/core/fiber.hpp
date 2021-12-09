@@ -6,6 +6,7 @@
 #include <boost/context/fiber_fcontext.hpp>
 #include <boost/context/detail/fcontext.hpp>
 
+#include <inplace_function.h>
 #include <palanteer.h>
 #include <spdlog/spdlog.h>
 
@@ -25,9 +26,12 @@
 #	endif
 #endif
 
+#if !defined(NP_DETAIL_USE_NAKED_RESUME) && defined(_MSC_VER)
+    #define NP_DETAIL_USE_NAKED_RESUME
+#endif
+
 namespace np
 {
-    class fiber;
     class fiber_pool_base;
 
     struct empty_fiber_t
@@ -53,6 +57,7 @@ namespace np
     {
         inline boost::context::detail::transfer_t builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
         inline void builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
+        inline boost::context::detail::transfer_t builtin_fiber_yield(boost::context::detail::transfer_t transfer) noexcept;
 
         inline std::size_t page_size() noexcept
         {
@@ -65,7 +70,8 @@ namespace np
 #endif
         }
 
-        inline std::size_t round_up(std::size_t stack_size, std::size_t page_size_or_zero) {
+        inline std::size_t round_up(std::size_t stack_size, std::size_t page_size_or_zero)
+        {
             if (page_size_or_zero == 0)
             {
                 return stack_size;
@@ -127,30 +133,128 @@ namespace np
 #endif
 
         inline np::counter dummy_counter(true);
-
-        struct record
-        {
-            np::fiber* former;
-            np::fiber* latter;
-        };
     }
 
-    class fiber final
+    struct default_fiber_traits
+    {
+        static const uint32_t inplace_function_size = 64;
+        static const uint32_t stack_size = 524288;
+    };
+
+    class fiber_base
     {
         friend class fiber_pool_base;
         template <typename traits> friend class fiber_pool;
         friend inline boost::context::detail::transfer_t detail::builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
         friend inline void detail::builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
+        friend inline boost::context::detail::transfer_t detail::builtin_fiber_yield(boost::context::detail::transfer_t transfer) noexcept;
 
+    protected:
         static inline uint32_t current_id = 10000;
         static inline std::size_t page_size = detail::page_size();
 
     public:
-        fiber() noexcept;
-        fiber(const char* fiber_name) noexcept;
-        fiber(empty_fiber_t) noexcept;
-        fiber(std::size_t stack_size, empty_fiber_t) noexcept;
-        fiber(const char* fiber_name, std::size_t stack_size, empty_fiber_t) noexcept;
+        fiber_base() noexcept;
+        fiber_base(const char* fiber_name) noexcept;
+        fiber_base(empty_fiber_t) noexcept;
+        fiber_base(std::size_t stack_size, empty_fiber_t) noexcept;
+        fiber_base(const char* fiber_name, empty_fiber_t) noexcept;
+        fiber_base(const char* fiber_name, std::size_t stack_size, empty_fiber_t) noexcept;
+
+        ~fiber_base() noexcept;
+
+        fiber_base(const fiber_base&) = delete;
+        fiber_base& operator=(const fiber_base&) = delete;
+
+        fiber_base(fiber_base&& other) noexcept;
+        fiber_base& operator=(fiber_base&& other) noexcept;
+
+        inline fiber_status status() const noexcept;
+        inline np::counter* counter() noexcept;
+
+        inline uint32_t id() const noexcept;
+        inline void execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept;
+        inline fiber_execution_status execution_status(badge<fiber_pool_base>) noexcept;
+
+        inline fiber_base& resume(fiber_base* fiber) noexcept;
+        void yield() noexcept;
+        void yield(fiber_base* to) noexcept;
+
+    protected:
+        void yield_blocking(fiber_base* to) noexcept;
+
+    protected:
+        // Context switching information
+        boost::context::detail::fcontext_t _ctx;
+        boost::context::detail::fcontext_t* _former_ctx;
+
+        // Fiber information
+        uint32_t _id;
+        std::size_t _stack_size;
+        fiber_status _status;
+        std::atomic<fiber_execution_status> _execution_status;
+
+        // Execution information
+        np::counter* _counter;
+        void* _stack;
+    };
+
+
+    inline fiber_status fiber_base::status() const noexcept
+    {
+        return _status;
+    }
+
+    inline np::counter* fiber_base::counter() noexcept
+    {
+        return _counter;
+    }
+
+    inline uint32_t fiber_base::id() const noexcept
+    {
+        return _id;
+    }
+
+    inline void fiber_base::execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept
+    {
+        // TODO(gpascualg): Verify memory order!
+        _execution_status.store(status, std::memory_order_release);
+    }
+
+    inline fiber_execution_status fiber_base::execution_status(badge<fiber_pool_base>) noexcept
+    {
+        return _execution_status.load(std::memory_order_acquire);
+    }
+
+    inline fiber_base& fiber_base::resume(fiber_base* fiber) noexcept
+    {
+        fiber->_former_ctx = &this->_ctx;
+        fiber->_status = fiber_status::running;
+
+#if defined(NP_DETAIL_USE_NAKED_RESUME)
+        detail::call_fn fiber_resume = (detail::call_fn)detail::naked_resume_ptr;
+#else
+        detail::call_fn fiber_resume = &detail::builtin_fiber_resume;
+#endif
+
+        boost::context::detail::ontop_fcontext(fiber->_ctx, fiber, fiber_resume);
+        //boost::context::detail::ontop_fcontext(fiber->_ctx, &fiber->_record, &detail::builtin_fiber_resume);
+        // auto transfer = boost::context::detail::jump_fcontext(fiber->_ctx, &fiber->_record);
+        return *fiber;
+    }
+
+
+    template <typename traits = default_fiber_traits>
+    class fiber final : public fiber_base
+    {
+        friend class fiber_pool_base;
+        template <typename traits> friend class fiber_pool;
+        friend inline boost::context::detail::transfer_t detail::builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
+        friend inline void detail::builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
+        friend inline boost::context::detail::transfer_t detail::builtin_fiber_yield(boost::context::detail::transfer_t transfer) noexcept;
+
+    public:
+        using fiber_base::fiber_base;
 
         template <typename F>
         fiber(F&& function) noexcept;
@@ -159,15 +263,16 @@ namespace np
         fiber(std::size_t stack_size, F&& function) noexcept;
 
         template <typename F>
+        fiber(const char* fiber_name, F&& function) noexcept;
+
+        template <typename F>
         fiber(const char* fiber_name, std::size_t stack_size, F&& function) noexcept;
 
         fiber(const fiber&) = delete;
-        fiber& operator=(const fiber&) = delete;
+        fiber<traits>& operator=(const fiber<traits>&) = delete;
 
         fiber(fiber&& other) noexcept;
-        fiber& operator=(fiber&& other) noexcept;
-
-        ~fiber() noexcept;
+        fiber<traits>& operator=(fiber<traits>&& other) noexcept;
 
         template <typename F>
         void reset(F&& function) noexcept;
@@ -175,79 +280,65 @@ namespace np
         template <typename F>
         void reset(F&& function, np::counter& counter) noexcept;
 
-        inline fiber& resume(fiber* fiber) noexcept;
-        void yield() noexcept;
-        void yield(fiber* to) noexcept;
-
-        inline fiber_status status() const noexcept;
-        inline np::counter* counter() noexcept;
-        
-        inline uint32_t id() const noexcept;
-        inline void execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept;
-        inline fiber_execution_status execution_status(badge<fiber_pool_base>) noexcept;
-
     private:
-        void yield_blocking(fiber* to) noexcept;
         inline void execute() noexcept;
 
     private:
-        uint32_t _id;
-        void* _stack;
-        std::size_t _stack_size;
-        boost::context::detail::fcontext_t _ctx;
-        std::function<void()> _function;
-        fiber_status _status;
-        std::atomic<fiber_execution_status> _execution_status;
-
-        // Fiber switching
-        np::counter* _counter;
-        detail::record _record;
+        stdext::inplace_function<void(), traits::inplace_function_size> _function;
     };
 
+    
+    template <typename traits>
     template <typename F>
-    fiber::fiber(F&& function) noexcept :
-        fiber{ 524288, std::forward<F>(function) }
+    fiber<traits>::fiber(F&& function) noexcept :
+        fiber{ "Fibers/%d", std::forward<F>(function) }
     {}
 
+    template <typename traits>
     template <typename F>
-    fiber::fiber(std::size_t stack_size, F&& function) noexcept :
+    fiber<traits>::fiber(std::size_t stack_size, F && function) noexcept :
         fiber{ "Fibers/%d", stack_size, std::forward<F>(function) }
     {}
 
+    template <typename traits>
     template <typename F>
-    fiber::fiber(const char* fiber_name, std::size_t stack_size, F&& function) noexcept :
-        _id(current_id++),
-#if !defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
-        _stack_size(stack_size),
-#endif
-        _function(std::forward<F>(function)),
-        _status(fiber_status::initialized),
-        _execution_status(fiber_execution_status::ready),
-        _counter(&detail::dummy_counter)
+    fiber<traits>::fiber(const char* fiber_name, F&& function) noexcept :
+        fiber{ "Fibers/%d", 524288, std::forward<F>(function) }
+    {}
+
+    template <typename traits>
+    template <typename F>
+    fiber<traits>::fiber(const char* fiber_name, std::size_t stack_size, F&& function) noexcept :
+        fiber_base{ fiber_name, stack_size, empty_fiber_t{} },
+        _function(std::forward<F>(function))
+    {}
+
+    template <typename traits>
+    fiber<traits>::fiber(fiber<traits>&& other) noexcept :
+        fiber(),
+        fiber_base(std::move(static_cast<fiber_base&>(other)))
     {
-        plDeclareVirtualThread(_id, fiber_name, _id);
-
-#if defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
-        _stack_size = detail::round_up(stack_size, page_size);
-        _stack = detail::aligned_malloc(page_size + _stack_size + page_size, page_size);
-        _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
-
-        detail::memory_guard(_stack, page_size);
-        detail::memory_guard(static_cast<char*>(_stack) + page_size + _stack_size, page_size);
-#else
-        _stack = detail::aligned_malloc(_stack_size, sizeof(uintptr_t));
-        _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
-#endif
+        std::swap(_function, other._function);
     }
 
+    template <typename traits>
+    fiber<traits>& fiber<traits>::operator=(fiber<traits>&& other) noexcept
+    {
+        static_cast<fiber_base&>(*this) = std::move(static_cast<fiber_base&>(other));
+        std::swap(_function, other._function);
+        return *this;
+    }
+
+    template <typename traits>
     template <typename F>
-    inline void fiber::reset(F&& function) noexcept
+    inline void fiber<traits>::reset(F&& function) noexcept
     {
         reset(std::forward<F>(function), detail::dummy_counter);
     }
 
+    template <typename traits>
     template <typename F>
-    inline void fiber::reset(F&& function, np::counter& counter) noexcept
+    inline void fiber<traits>::reset(F&& function, np::counter& counter) noexcept
     {
         _function = std::forward<F>(function);
         _counter = &counter;
@@ -259,55 +350,11 @@ namespace np
         _status = fiber_status::initialized;
     }
 
-    inline fiber& fiber::resume(fiber* fiber) noexcept
-    {
-        fiber->_record.former = this;
-        fiber->_record.latter = fiber;
-        fiber->_status = fiber_status::running;
-
-
-#if defined(_MSC_VER)
-        detail::call_fn fiber_resume = (detail::call_fn)detail::naked_resume_ptr;
-#else
-        detail::call_fn fiber_resume = &detail::builtin_fiber_resume;
-#endif
-
-        boost::context::detail::ontop_fcontext(fiber->_ctx, &fiber->_record, fiber_resume);
-        //boost::context::detail::ontop_fcontext(fiber->_ctx, &fiber->_record, &detail::builtin_fiber_resume);
-        // auto transfer = boost::context::detail::jump_fcontext(fiber->_ctx, &fiber->_record);
-        return *fiber;
-    }
-
-    inline fiber_status fiber::status() const noexcept
-    {
-        return _status;
-    }
-
-    inline np::counter* fiber::counter() noexcept
-    {
-        return _counter;
-    }
-
-    inline uint32_t fiber::id() const noexcept
-    {
-        return _id;
-    }
-
-    inline void fiber::execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept
-    {
-        // TODO(gpascualg): Verify memory order!
-        _execution_status.store(status, std::memory_order_release);
-    }
-
-    inline fiber_execution_status fiber::execution_status(badge<fiber_pool_base>) noexcept
-    {
-        return _execution_status.load(std::memory_order_acquire);
-    }
-
-    inline void fiber::execute() noexcept
+    template <typename traits>
+    inline void fiber<traits>::execute() noexcept
     {
         _function();
-        _counter->done({});
+        _counter->template done<traits>({});
         _status = fiber_status::ended;
         plDetachVirtualThread(false);
     }
@@ -316,17 +363,26 @@ namespace np
     {
         inline boost::context::detail::transfer_t builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept
         {
-            auto record = reinterpret_cast<detail::record*>(transfer.data);
-            record->former->_ctx = transfer.fctx;
+            auto fiber = reinterpret_cast<np::fiber_base*>(transfer.data);
+            *fiber->_former_ctx = transfer.fctx;
             return { nullptr, nullptr };
         }
         
         inline void builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept
         {
-            auto record = reinterpret_cast<detail::record*>(transfer.data);
-            record->latter->execute();
+            // TODO(gpascualg): Casting to default traits should not be a problem, as all allocation has already been done
+            //  and data that depends on traits (ie. its size is given by traits)
+            auto fiber = reinterpret_cast<np::fiber<default_fiber_traits>*>(transfer.data);
+            fiber->execute();
             //fiber->_ctx = boost::context::detail::jump_fcontext(transfer.fctx, 0).fctx;
-            boost::context::detail::jump_fcontext(record->former->_ctx, 0);
+            boost::context::detail::jump_fcontext(*fiber->_former_ctx, 0);
+        }
+
+        inline boost::context::detail::transfer_t builtin_fiber_yield(boost::context::detail::transfer_t transfer) noexcept
+        {
+            auto ctx = (boost::context::detail::fcontext_t*)transfer.data;
+            *ctx = transfer.fctx;
+            return { nullptr, nullptr };
         }
     }
 }

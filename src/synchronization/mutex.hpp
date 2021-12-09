@@ -11,7 +11,7 @@
 namespace np
 {
     class barrier;
-    class fiber;
+    class fiber_base;
 }
 
 namespace np
@@ -35,6 +35,6 @@ namespace np
 
     private:
         std::atomic<status> _status;
-        moodycamel::ConcurrentQueue<np::fiber*> _waiting_fibers;
+        moodycamel::ConcurrentQueue<np::fiber_base*> _waiting_fibers;
     };
 }

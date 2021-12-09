@@ -27,7 +27,7 @@ namespace np
 				detail::fiber_pool_instance->yield();
 			}
 
-			np::fiber* fiber;
+			np::fiber_base* fiber;
 			while (_waiting_fibers.try_dequeue(fiber))
 			{
 				assert(detail::fiber_pool_instance != nullptr && "Mutexes with waiting fibers require a fiber pool");

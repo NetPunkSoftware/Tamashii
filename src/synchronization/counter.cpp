@@ -22,7 +22,7 @@ namespace np
 		_fiber = nullptr;
 	}
 
-	void counter::done() noexcept
+	void counter::done_impl() noexcept
 	{
         if (_ignore_waiter)
         {
@@ -30,7 +30,7 @@ namespace np
             return;
         }
 
-        np::fiber* waiter;
+        np::fiber_base* waiter;
         while (!(waiter = _fiber.load(std::memory_order_relaxed)))
         {
             detail::fiber_pool_instance->yield();

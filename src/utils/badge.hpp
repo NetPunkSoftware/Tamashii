@@ -16,5 +16,5 @@ class badge
 	BOOST_PP_REPEAT(128, VARIADIC_FRIENDS, T)
 
 private:
-	badge() = default;
+	constexpr badge() noexcept = default;
 };

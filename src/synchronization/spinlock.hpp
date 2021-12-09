@@ -10,7 +10,7 @@
 
 namespace np
 {
-    class fiber;
+    class fiber_base;
 }
 
 namespace np
@@ -77,6 +77,6 @@ namespace np
 
     private:
         std::atomic<bool> _lock;
-        moodycamel::ConcurrentQueue<np::fiber*> _waiting_fibers;
+        moodycamel::ConcurrentQueue<np::fiber_base*> _waiting_fibers;
 	};
 }

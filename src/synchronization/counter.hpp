@@ -7,7 +7,8 @@
 
 namespace np
 {
-	class fiber;
+	class fiber_base;
+	template <typename traits> class fiber;
     template <typename traits> class fiber_pool;
 
 	class counter
@@ -22,16 +23,17 @@ namespace np
         template <typename traits>
         void increase(badge<fiber_pool<traits>>) noexcept;
 
-		inline void done(badge<fiber>) noexcept;
+		template <typename traits>
+		inline void done(badge<np::fiber<traits>>) noexcept;
 
     protected:
-        void done() noexcept;
+        void done_impl() noexcept;
 
 	private:
 		bool _ignore_waiter;
 		std::atomic<std::size_t> _size;
 		std::atomic<std::size_t> _done;
-		std::atomic<np::fiber*> _fiber;
+		std::atomic<fiber_base*> _fiber;
 	};
 
 
@@ -40,9 +42,10 @@ namespace np
     {
         ++_size;
     }
-    
-    inline void counter::done(badge<fiber>) noexcept
+
+	template <typename traits>
+    inline void counter::done(badge<np::fiber<traits>>) noexcept
     {
-        done();
+		done_impl();
     }
 }

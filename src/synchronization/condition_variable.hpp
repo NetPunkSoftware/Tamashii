@@ -5,7 +5,7 @@
 
 namespace np
 {
-	class fiber;
+	class fiber_base;
 	class mutex;
 
 	class condition_variable
@@ -19,6 +19,6 @@ namespace np
 		void wait(np::mutex& mutex) noexcept;
 
 	private:
-		moodycamel::ConcurrentQueue<np::fiber*> _waiting_fibers;
+		moodycamel::ConcurrentQueue<np::fiber_base*> _waiting_fibers;
 	};
 }
