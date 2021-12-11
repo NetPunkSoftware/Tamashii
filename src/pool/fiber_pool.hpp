@@ -7,7 +7,6 @@
 #include <concurrentqueue.h>
 
 #include <array>
-#include <functional>
 #include <thread>
 #include <vector>
 
@@ -67,12 +66,6 @@ namespace np
     {
         template <typename traits> friend class fiber_pool;
 
-        struct task_bundle
-        {
-            np::counter* counter;
-            std::function<void()> function;
-        };
-
     public:
         fiber_pool_base() noexcept;
 
@@ -109,13 +102,18 @@ namespace np
         std::vector<np::fiber_base*> _running_fibers;
         moodycamel::ConcurrentQueue<np::fiber_base*> _fibers;
         moodycamel::ConcurrentQueue<np::fiber_base*> _awaiting_fibers;
-        moodycamel::ConcurrentQueue<task_bundle> _tasks;
         np::spinbarrier _barrier;
     };
 
     template <typename traits = detail::default_fiber_pool_traits>
     class fiber_pool : public fiber_pool_base
     {
+        struct task_bundle
+        {
+            np::counter* counter;
+            stdext::inplace_function<void(), traits::inplace_function_size> function;
+        };
+
     public:
         fiber_pool() noexcept;
 
@@ -136,6 +134,9 @@ namespace np
 
     protected:
         bool get_free_fiber(np::fiber_base*& fiber) noexcept;
+
+    private:
+        moodycamel::ConcurrentQueue<task_bundle> _tasks;
     };
 
 
@@ -161,7 +162,8 @@ namespace np
 
     template <typename traits>
     fiber_pool<traits>::fiber_pool() noexcept :
-        fiber_pool_base()
+        fiber_pool_base(),
+        _tasks()
     {
         if constexpr (traits::preemtive_fiber_creation)
         {
