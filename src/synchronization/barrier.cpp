@@ -20,24 +20,29 @@ namespace np
 
 	void barrier::wait() noexcept
 	{
+		wait(detail::fiber_pool_instance);
+	}
+
+	void barrier::wait(fiber_pool_base* fiber_pool) noexcept
+	{
 		if (--_waiting == 0)
 		{
 			while (_waiting_fibers.size_approx() != _size)
 			{
-				detail::fiber_pool_instance->yield();
+				fiber_pool->yield();
 			}
 
 			np::fiber_base* fiber;
 			while (_waiting_fibers.try_dequeue(fiber))
 			{
-				assert(detail::fiber_pool_instance != nullptr && "Mutexes with waiting fibers require a fiber pool");
-				detail::fiber_pool_instance->unblock({}, fiber);
+				assert(fiber_pool != nullptr && "Mutexes with waiting fibers require a fiber pool");
+				fiber_pool->unblock({}, fiber);
 			}
 
 			return;
 		}
 		
-		_waiting_fibers.enqueue(detail::fiber_pool_instance->this_fiber());
-		detail::fiber_pool_instance->block({});
+		_waiting_fibers.enqueue(fiber_pool->this_fiber());
+		fiber_pool->block({});
 	}
 }

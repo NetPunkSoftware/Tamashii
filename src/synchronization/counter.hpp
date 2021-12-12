@@ -8,8 +8,7 @@
 namespace np
 {
 	class fiber_base;
-	template <typename traits> class fiber;
-    template <typename traits> class fiber_pool;
+    class fiber_pool_base;
 
 	class counter
 	{
@@ -20,14 +19,14 @@ namespace np
 		void reset() noexcept;
 		void wait() noexcept;
 
-        template <typename traits>
-        void increase(badge<fiber_pool<traits>>) noexcept;
+		// Explicit methods
+		void wait(fiber_pool_base* fiber_pool) noexcept;
 
-		template <typename traits>
-		inline void done(badge<np::fiber<traits>>) noexcept;
+        inline void increase(badge<fiber_pool_base>) noexcept;
+		inline void done(badge<fiber_base>, fiber_pool_base* fiber_pool) noexcept;
 
     protected:
-        void done_impl() noexcept;
+        void done_impl(fiber_pool_base* fiber_pool) noexcept;
 
 	private:
 		bool _ignore_waiter;
@@ -37,15 +36,13 @@ namespace np
 	};
 
 
-    template <typename traits>
-    void counter::increase(badge<fiber_pool<traits>>) noexcept
+    inline void counter::increase(badge<fiber_pool_base>) noexcept
     {
         ++_size;
     }
 
-	template <typename traits>
-    inline void counter::done(badge<np::fiber<traits>>) noexcept
+    inline void counter::done(badge<fiber_base>, fiber_pool_base* fiber_pool) noexcept
     {
-		done_impl();
+		done_impl(fiber_pool);
     }
 }

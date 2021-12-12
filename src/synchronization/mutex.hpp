@@ -12,6 +12,7 @@ namespace np
 {
     class barrier;
     class fiber_base;
+    class fiber_pool_base;
 }
 
 namespace np
@@ -32,6 +33,10 @@ namespace np
         void lock() noexcept;
         bool try_lock() noexcept;
         void unlock() noexcept;
+
+        // Explicit methods
+        void lock(fiber_pool_base* fiber_pool) noexcept;
+        void unlock(fiber_pool_base* fiber_pool) noexcept;
 
     private:
         std::atomic<status> _status;

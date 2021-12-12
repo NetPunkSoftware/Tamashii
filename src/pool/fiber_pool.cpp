@@ -7,7 +7,7 @@
 
 namespace np
 {
-    fiber_pool_base::fiber_pool_base() noexcept :
+    fiber_pool_base::fiber_pool_base(bool create_instance) noexcept :
         _running(false),
         _number_of_spawned_fibers(0),
         _worker_threads(),
@@ -18,7 +18,10 @@ namespace np
         _awaiting_fibers(),
         _barrier(0)
     {
-        detail::fiber_pool_instance = this;
+        if (create_instance)
+        {
+            detail::fiber_pool_instance = this;
+        }
     }
 
     fiber_base* fiber_pool_base::this_fiber() noexcept

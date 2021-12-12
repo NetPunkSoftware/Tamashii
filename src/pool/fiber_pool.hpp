@@ -2,6 +2,7 @@
 
 #include "core/fiber.hpp"
 #include "utils/badge.hpp"
+#include "synchronization/counter.hpp"
 #include "synchronization/spinbarrier.hpp"
 
 #include <concurrentqueue.h>
@@ -67,7 +68,7 @@ namespace np
         template <typename traits> friend class fiber_pool;
 
     public:
-        fiber_pool_base() noexcept;
+        fiber_pool_base(bool create_instance = true) noexcept;
 
         uint8_t thread_index() const noexcept;
         fiber_base* this_fiber() noexcept;
@@ -241,7 +242,7 @@ namespace np
     template <typename F>
     void fiber_pool<traits>::push(F&& function, np::counter& counter) noexcept
     {
-        counter.increase<traits>({});
+        counter.increase(badge());
 
         np::fiber_base* fiber;
         if (!get_free_fiber(fiber))
@@ -361,7 +362,7 @@ namespace np
             _running_fibers[idx] = fiber;
 
             plAttachVirtualThread(fiber->_id);
-            _dispatcher_fibers[idx]->resume(fiber);
+            _dispatcher_fibers[idx]->resume(this, fiber);
             plAttachVirtualThread(_dispatcher_fibers[idx]->_id);
 
             spdlog::debug("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
@@ -369,38 +370,38 @@ namespace np
             // Push fiber back
             switch (fiber->status())
             {
-            case fiber_status::ended:
-            {
-                plBegin("Dispatcher pop task");
-                task_bundle task;
-                if (_tasks.try_dequeue(task))
+                case fiber_status::ended:
                 {
-                    reinterpret_cast<np::fiber<traits>*>(fiber)->reset(std::move(task.function), *task.counter);
+                    plBegin("Dispatcher pop task");
+                    task_bundle task;
+                    if (_tasks.try_dequeue(task))
+                    {
+                        reinterpret_cast<np::fiber<traits>*>(fiber)->reset(std::move(task.function), *task.counter);
+                        _awaiting_fibers.enqueue(std::move(fiber));
+                    }
+                    else
+                    {
+                        _fibers.enqueue(std::move(fiber));
+                    }
+                    plEnd("Dispatcher pop task");
+                }
+                break;
+
+                case fiber_status::yielded:
+                    plBegin("Dispatcher push awaiting");
                     _awaiting_fibers.enqueue(std::move(fiber));
-                }
-                else
-                {
-                    _fibers.enqueue(std::move(fiber));
-                }
-                plEnd("Dispatcher pop task");
-            }
-            break;
+                    plEnd("Dispatcher push awaiting");
+                    break;
 
-            case fiber_status::yielded:
-                plBegin("Dispatcher push awaiting");
-                _awaiting_fibers.enqueue(std::move(fiber));
-                plEnd("Dispatcher push awaiting");
-                break;
+                case fiber_status::blocked:
+                    // Do nothing, the mutex will already hold a reference to the fiber
+                    break;
 
-            case fiber_status::blocked:
-                // Do nothing, the mutex will already hold a reference to the fiber
-                break;
-
-            default:
-                assert(false && "Fiber ended with unexpected status");
-                unreachable();
-                abort();
-                break;
+                default:
+                    assert(false && "Fiber ended with unexpected status");
+                    unreachable();
+                    abort();
+                    break;
             }
 
             fiber->execution_status(badge(), fiber_execution_status::ready);

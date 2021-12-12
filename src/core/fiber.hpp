@@ -136,7 +136,7 @@ namespace np
     inline void fiber<traits>::execute() noexcept
     {
         _function();
-        _counter->template done<traits>({});
+        _counter->done(badge(), _fiber_pool);
         _status = fiber_status::ended;
         plDetachVirtualThread(false);
     }

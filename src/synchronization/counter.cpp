@@ -22,7 +22,7 @@ namespace np
 		_fiber = nullptr;
 	}
 
-	void counter::done_impl() noexcept
+	void counter::done_impl(fiber_pool_base* fiber_pool) noexcept
 	{
         if (_ignore_waiter)
         {
@@ -33,20 +33,25 @@ namespace np
         np::fiber_base* waiter;
         while (!(waiter = _fiber.load(std::memory_order_relaxed)))
         {
-            detail::fiber_pool_instance->yield();
-        }
-        
+			fiber_pool->yield();
+		}
+
 		if (++_done == _size)
 		{
-			detail::fiber_pool_instance->unblock({}, waiter);
+			fiber_pool->unblock({}, waiter);
 		}
 	}
 
 	void counter::wait() noexcept
 	{
+		wait(detail::fiber_pool_instance);
+	}
+
+	void counter::wait(fiber_pool_base* fiber_pool) noexcept
+	{
 		assert(_fiber.load(std::memory_order_relaxed) == nullptr && "Only one fiber can wait on a counter");
 
-		_fiber.store(detail::fiber_pool_instance->this_fiber(), std::memory_order_release);
-		detail::fiber_pool_instance->block({});
+		_fiber.store(fiber_pool->this_fiber(), std::memory_order_release);
+		fiber_pool->block({});
 	}
 }

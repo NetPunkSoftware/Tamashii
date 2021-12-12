@@ -6,21 +6,31 @@ namespace np
 {
 	void event::notify() noexcept
 	{
-		assert(detail::fiber_pool_instance != nullptr && "Conditions variable require a fiber pool");
+		notify(detail::fiber_pool_instance);
+	}
+
+	void event::notify(fiber_pool_base* fiber_pool) noexcept
+	{
+		assert(fiber_pool != nullptr && "Conditions variable require a fiber pool");
 
 		if (_awaiter)
 		{
-			np::detail::fiber_pool_instance->unblock({}, _awaiter);
+			fiber_pool->unblock({}, _awaiter);
 		}
 	}
 
 	void event::wait(np::mutex& mutex) noexcept
 	{
-		assert(detail::fiber_pool_instance != nullptr && "Conditions variable require a fiber pool");
+		wait(detail::fiber_pool_instance, mutex);
+	}
 
-		_awaiter = np::detail::fiber_pool_instance->this_fiber();
+	void event::wait(fiber_pool_base* fiber_pool, np::mutex& mutex) noexcept
+	{
+		assert(fiber_pool != nullptr && "Conditions variable require a fiber pool");
+
+		_awaiter = fiber_pool->this_fiber();
 		mutex.unlock();
-		np::detail::fiber_pool_instance->block({});
+		fiber_pool->block({});
 		mutex.lock();
 	}
 }

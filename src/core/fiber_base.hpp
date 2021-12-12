@@ -70,20 +70,29 @@ namespace np
         inline np::counter* counter() noexcept;
 
         inline uint32_t id() const noexcept;
-        inline void execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept;
-        inline fiber_execution_status execution_status(badge<fiber_pool_base>) noexcept;
+        inline void execution_status(::badge<fiber_pool_base>, fiber_execution_status status) noexcept;
+        inline fiber_execution_status execution_status(::badge<fiber_pool_base>) noexcept;
 
         inline fiber_base& resume(fiber_base* fiber) noexcept;
         void yield() noexcept;
         void yield(fiber_base* to) noexcept;
 
+        // Explicit methods
+        inline fiber_base& resume(fiber_pool_base* fiber_pool, fiber_base* fiber) noexcept;
+
     protected:
         void yield_blocking(fiber_base* to) noexcept;
+
+        inline constexpr auto badge()
+        {
+            return ::badge<fiber_base>{};
+        }
 
     protected:
         // Context switching information
         boost::context::detail::fcontext_t _ctx;
         boost::context::detail::fcontext_t* _former_ctx;
+        fiber_pool_base* _fiber_pool;
 
         // Fiber information
         uint32_t _id;
@@ -112,20 +121,26 @@ namespace np
         return _id;
     }
 
-    inline void fiber_base::execution_status(badge<fiber_pool_base>, fiber_execution_status status) noexcept
+    inline void fiber_base::execution_status(::badge<fiber_pool_base>, fiber_execution_status status) noexcept
     {
         // TODO(gpascualg): Verify memory order!
         _execution_status.store(status, std::memory_order_release);
     }
 
-    inline fiber_execution_status fiber_base::execution_status(badge<fiber_pool_base>) noexcept
+    inline fiber_execution_status fiber_base::execution_status(::badge<fiber_pool_base>) noexcept
     {
         return _execution_status.load(std::memory_order_acquire);
     }
 
     inline fiber_base& fiber_base::resume(fiber_base* fiber) noexcept
     {
+        return resume(nullptr, fiber);
+    }
+
+    inline fiber_base& fiber_base::resume(fiber_pool_base* fiber_pool, fiber_base* fiber) noexcept
+    {
         fiber->_former_ctx = &this->_ctx;
+        fiber->_fiber_pool = fiber_pool;
         fiber->_status = fiber_status::running;
 
 #if defined(NP_DETAIL_USE_NAKED_RESUME)

@@ -74,6 +74,7 @@ namespace np
     {
         std::swap(_ctx, other._ctx);
         std::swap(_former_ctx, other._former_ctx);
+        std::swap(_fiber_pool, other._fiber_pool);
         std::swap(_id, other._id);
         std::swap(_stack_size, other._stack_size);
         std::swap(_status, other._status);
@@ -86,6 +87,7 @@ namespace np
     {
         std::swap(_ctx, other._ctx);
         std::swap(_former_ctx, other._former_ctx);
+        std::swap(_fiber_pool, other._fiber_pool);
         std::swap(_id, other._id);
         std::swap(_stack_size, other._stack_size);
         std::swap(_status, other._status);
