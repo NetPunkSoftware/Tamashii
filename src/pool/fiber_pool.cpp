@@ -16,7 +16,6 @@ namespace np
         _running_fibers(),
         _fibers(),
         _awaiting_fibers(),
-        _tasks(),
         _barrier(0)
     {
         detail::fiber_pool_instance = this;

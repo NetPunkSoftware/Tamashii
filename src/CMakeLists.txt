@@ -2,6 +2,9 @@ set(LIB_SOURCES
     container/spmc_queue.hpp
     core/fiber.hpp
     core/fiber.cpp
+    core/fiber_base.hpp
+    core/fiber_base.cpp
+    core/detail/fiber.hpp
     ext/channel.hpp
     ext/executor.hpp
     ext/executor.cpp
