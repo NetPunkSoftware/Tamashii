@@ -20,7 +20,7 @@ namespace np
             0x48, 0x8b, 0x40, 0x08 ,    // mov    rax,QWORD PTR[rax + 0x8]
             // R9 = transfer.fctx
             0x4c, 0x8b, 0x09,           // mov    r9,QWORD PTR[rcx]
-            // RAX->_former_ctx = R9
+            // *RAX (*_former_ctx) = R9
             0x4c, 0x89, 0x08,           // mov    QWORD PTR[rax],r9
             // Done
             0xC3                        // ret
