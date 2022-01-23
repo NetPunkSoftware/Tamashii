@@ -6,48 +6,32 @@ namespace np
 {
 	void condition_variable::notify_one() noexcept
 	{
-		notify_one(detail::fiber_pool_instance);
-	}
-
-	void condition_variable::notify_one(fiber_pool_base* fiber_pool) noexcept
-	{
-		assert(fiber_pool != nullptr && "Conditions variable require a fiber pool");
-
 		np::fiber_base* fiber;
 		if (_waiting_fibers.try_dequeue(fiber))
 		{
-			fiber_pool->unblock({}, fiber);
+			assert(fiber->get_fiber_pool() != nullptr && "Conditions variable require a fiber pool");
+			fiber->get_fiber_pool()->unblock({}, fiber);
 		}
 	}
 
 	void condition_variable::notify_all() noexcept
 	{
-		notify_all(detail::fiber_pool_instance);
-	}
-
-	void condition_variable::notify_all(fiber_pool_base* fiber_pool) noexcept
-	{
-		assert(fiber_pool != nullptr && "Conditions variable require a fiber pool");
-
 		np::fiber_base* fiber;
 		while (_waiting_fibers.try_dequeue(fiber))
 		{
-			fiber_pool->unblock({}, fiber);
+			assert(fiber->get_fiber_pool() != nullptr && "Conditions variable require a fiber pool");
+			fiber->get_fiber_pool()->unblock({}, fiber);
 		}
 	}
 
 	void condition_variable::wait(np::mutex& mutex) noexcept
 	{
-		wait(detail::fiber_pool_instance, mutex);
-	}
+		auto fiber = this_fiber::instance();
+		assert(fiber->get_fiber_pool() != nullptr && "Conditions variable require a fiber pool");
 
-	void condition_variable::wait(fiber_pool_base* fiber_pool, np::mutex& mutex) noexcept
-	{
-		assert(fiber_pool != nullptr && "Conditions variable require a fiber pool");
-
-		_waiting_fibers.enqueue(fiber_pool->this_fiber());
+		_waiting_fibers.enqueue(fiber);
 		mutex.unlock();
-		fiber_pool->block({});
+		fiber->get_fiber_pool()->block({});
 		mutex.lock();
 	}
 }

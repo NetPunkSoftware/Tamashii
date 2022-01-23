@@ -19,9 +19,6 @@ namespace np
 		void reset() noexcept;
 		void wait() noexcept;
 
-		// Explicit methods
-		void wait(fiber_pool_base* fiber_pool) noexcept;
-
         inline void increase(badge<fiber_pool_base>) noexcept;
 		inline void done(badge<fiber_base>, fiber_pool_base* fiber_pool) noexcept;
 

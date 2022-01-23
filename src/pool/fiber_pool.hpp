@@ -51,7 +51,7 @@ namespace np
         {
             // Fiber pool traits
             static const bool preemtive_fiber_creation = true;
-            static const uint32_t maximum_fibers = 10;
+            static const uint32_t maximum_fibers = 300;
             static const uint32_t yield_priority = 2;
 
             // Fiber traits
@@ -70,8 +70,8 @@ namespace np
     public:
         fiber_pool_base(bool create_instance = true) noexcept;
 
-        uint8_t thread_index() const noexcept;
-        fiber_base* this_fiber() noexcept;
+        static uint8_t thread_index() noexcept;
+        static fiber_base* this_fiber() noexcept;
         void yield() noexcept;
 
         using protected_access_t = ::badge<np::mutex, np::one_way_barrier, np::barrier, np::counter, np::condition_variable, np::event>;
@@ -93,14 +93,16 @@ namespace np
         }
 
     protected:
+        static std::atomic<uint8_t> _fiber_worker_id;
+        static std::array<std::thread::id, 256> _thread_ids;
+        static std::array<np::fiber_base*, 256> _running_fibers;
+        static std::array<np::fiber_base*, 256> _dispatcher_fibers;
+
         bool _running;
         uint16_t _number_of_threads;
         uint32_t _number_of_spawned_fibers;
         uint32_t _target_number_of_fibers;
         std::vector<std::thread> _worker_threads;
-        std::vector<std::thread::id> _thread_ids;
-        std::vector<np::fiber_base*> _dispatcher_fibers;
-        std::vector<np::fiber_base*> _running_fibers;
         moodycamel::ConcurrentQueue<np::fiber_base*> _fibers;
         moodycamel::ConcurrentQueue<np::fiber_base*> _awaiting_fibers;
         np::spinbarrier _barrier;
@@ -200,10 +202,9 @@ namespace np
 
         _number_of_threads = number_of_threads;
         _target_number_of_fibers = traits::maximum_fibers;
-        _thread_ids.resize(number_of_threads);
-        _running_fibers.resize(number_of_threads);
-        _dispatcher_fibers.resize(number_of_threads);
-        _thread_ids[0] = std::this_thread::get_id();
+        
+        uint8_t main_worker_id = _fiber_worker_id++;
+        _thread_ids[main_worker_id] = std::this_thread::get_id();
         _running = true;
         _barrier.reset(number_of_threads);
 
@@ -211,13 +212,14 @@ namespace np
         for (int idx = 1; idx < number_of_threads; ++idx)
         {
             // Set dispatcher fiber
-            _dispatcher_fibers[idx] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
-            _worker_threads.emplace_back(&fiber_pool<traits>::worker_thread, this, idx);
+            uint8_t worker_id = _fiber_worker_id++;
+            _dispatcher_fibers[worker_id] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
+            _worker_threads.emplace_back(&fiber_pool<traits>::worker_thread, this, worker_id);
         }
 
         // Execute in main thread
-        _dispatcher_fibers[0] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
-        worker_thread(0);
+        _dispatcher_fibers[main_worker_id] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
+        worker_thread(main_worker_id);
     }
 
     template <typename traits>
@@ -427,9 +429,22 @@ namespace np
     // Convinient wrappers around methods
     namespace this_fiber
     {
+        inline fiber_base* instance() noexcept
+        {
+            assert(fiber_pool_base::this_fiber() && "Must be called inside a fiber");
+            return fiber_pool_base::this_fiber();
+        }
+        
+        inline fiber_pool_base* fiber_pool() noexcept
+        {
+            assert(instance()->get_fiber_pool() && "Must be called inside a fiber");
+            return instance()->get_fiber_pool();
+        }
+
         inline void yield() noexcept
         {
-            detail::fiber_pool_instance->yield();
+            assert(this_fiber::fiber_pool() && "Must be called inside a fiber");
+            this_fiber::fiber_pool()->yield();
         }
     }
 }

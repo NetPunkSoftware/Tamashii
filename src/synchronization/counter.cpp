@@ -44,14 +44,10 @@ namespace np
 
 	void counter::wait() noexcept
 	{
-		wait(detail::fiber_pool_instance);
-	}
-
-	void counter::wait(fiber_pool_base* fiber_pool) noexcept
-	{
 		assert(_fiber.load(std::memory_order_relaxed) == nullptr && "Only one fiber can wait on a counter");
 
-		_fiber.store(fiber_pool->this_fiber(), std::memory_order_release);
-		fiber_pool->block({});
+		auto fiber = this_fiber::instance();
+		_fiber.store(fiber, std::memory_order_release);
+		fiber->get_fiber_pool()->block({});
 	}
 }

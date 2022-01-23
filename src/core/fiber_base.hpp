@@ -69,6 +69,7 @@ namespace np
         inline fiber_status status() const noexcept;
         inline np::counter* counter() noexcept;
 
+        inline fiber_pool_base* get_fiber_pool() const noexcept;
         inline uint32_t id() const noexcept;
         inline void execution_status(::badge<fiber_pool_base>, fiber_execution_status status) noexcept;
         inline fiber_execution_status execution_status(::badge<fiber_pool_base>) noexcept;
@@ -116,6 +117,12 @@ namespace np
         return _counter;
     }
 
+    inline fiber_pool_base* fiber_base::get_fiber_pool() const noexcept
+    {
+        assert(_fiber_pool != nullptr && "Fiber has no fiber_pool");
+        return _fiber_pool;
+    }
+
     inline uint32_t fiber_base::id() const noexcept
     {
         return _id;
@@ -143,7 +150,7 @@ namespace np
         fiber->_fiber_pool = fiber_pool;
         fiber->_status = fiber_status::running;
 
-#if defined(NP_DETAIL_USE_NAKED_RESUME)
+#if defined(NP_DETAIL_USE_NAKED_CONTEXT)
         detail::call_fn fiber_resume = (detail::call_fn)detail::naked_resume_ptr;
 #else
         detail::call_fn fiber_resume = &detail::builtin_fiber_resume;

@@ -13,6 +13,7 @@ namespace np
     fiber_base::fiber_base(const char* fiber_name) noexcept :
         _ctx(nullptr),
         _former_ctx(nullptr),
+        _fiber_pool(nullptr),
         _id(current_id++),
         _stack_size(0),
         _status(fiber_status::uninitialized),
@@ -38,6 +39,7 @@ namespace np
     fiber_base::fiber_base(const char* fiber_name, std::size_t stack_size, empty_fiber_t) noexcept :
         _ctx(),
         _former_ctx(nullptr),
+        _fiber_pool(nullptr),
         _id(current_id++),
         _stack_size(stack_size),
         _status(fiber_status::initialized),
@@ -102,7 +104,13 @@ namespace np
     {
         plDetachVirtualThread(true);
         _status = fiber_status::yielded;
-        boost::context::detail::ontop_fcontext(_former_ctx, &_ctx, &detail::builtin_fiber_yield);
+
+#if defined(NP_DETAIL_USE_NAKED_CONTEXT)
+        detail::call_fn fiber_yield = (detail::call_fn)detail::naked_yield_ptr;
+#else
+        detail::call_fn fiber_yield = &detail::builtin_fiber_yield;
+#endif
+        boost::context::detail::ontop_fcontext(_former_ctx, &_ctx, fiber_yield);
         // boost::context::detail::jump_fcontext(_former_ctx, 0);
     }
 
@@ -110,13 +118,25 @@ namespace np
     {
         plDetachVirtualThread(true);
         _status = fiber_status::yielded;
-        boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, &detail::builtin_fiber_yield);
+        
+#if defined(NP_DETAIL_USE_NAKED_CONTEXT)
+        detail::call_fn fiber_yield = (detail::call_fn)detail::naked_yield_ptr;
+#else
+        detail::call_fn fiber_yield = &detail::builtin_fiber_yield;
+#endif
+        boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, fiber_yield);
     }
 
     void fiber_base::yield_blocking(fiber_base* to) noexcept
     {
         plDetachVirtualThread(true);
         _status = fiber_status::blocked;
-        boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, &detail::builtin_fiber_yield);
+        
+#if defined(NP_DETAIL_USE_NAKED_CONTEXT)
+        detail::call_fn fiber_yield = (detail::call_fn)detail::naked_yield_ptr;
+#else
+        detail::call_fn fiber_yield = &detail::builtin_fiber_yield;
+#endif
+        boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, fiber_yield);
     }
 }

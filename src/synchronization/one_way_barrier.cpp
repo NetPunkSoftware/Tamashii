@@ -19,13 +19,14 @@ namespace np
 	{
 		if (--_size == 0)
 		{
+			auto fiber = this_fiber::instance(); 
 			np::fiber_base* waiter;
 			while (!(waiter = _fiber.load(std::memory_order_relaxed)))
 			{
-				detail::fiber_pool_instance->yield();
+				fiber->get_fiber_pool()->yield();
 			}
 
-			detail::fiber_pool_instance->unblock({}, waiter);
+			waiter->get_fiber_pool()->unblock({}, waiter);
 		}
 	}
 
@@ -33,7 +34,8 @@ namespace np
 	{
 		assert(_fiber.load(std::memory_order_relaxed) == nullptr && "Only one fiber can wait on a one_way_barrier");
 
-		_fiber.store(detail::fiber_pool_instance->this_fiber(), std::memory_order_release);
-		detail::fiber_pool_instance->block({});
+		auto fiber = this_fiber::instance();
+		_fiber.store(fiber, std::memory_order_release);
+		fiber->get_fiber_pool()->block({});
 	}
 }

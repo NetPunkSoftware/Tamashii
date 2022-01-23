@@ -34,10 +34,6 @@ namespace np
         bool try_lock() noexcept;
         void unlock() noexcept;
 
-        // Explicit methods
-        void lock(fiber_pool_base* fiber_pool) noexcept;
-        void unlock(fiber_pool_base* fiber_pool) noexcept;
-
     private:
         std::atomic<status> _status;
         moodycamel::ConcurrentQueue<np::fiber_base*> _waiting_fibers;

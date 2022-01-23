@@ -62,6 +62,12 @@ namespace np
         template <typename F>
         void reset(F&& function, np::counter& counter) noexcept;
 
+        // HACK(gpascualg): This feels wrong
+        static inline constexpr size_t former_ctx_offset() noexcept
+        {
+            return np::detail::offset_of(&np::fiber<traits>::_former_ctx);
+        }
+
     private:
         inline void execute() noexcept;
 
@@ -136,6 +142,7 @@ namespace np
     inline void fiber<traits>::execute() noexcept
     {
         _function();
+        assert(_fiber_pool != nullptr && "Fiber has no fiber_pool");
         _counter->done(badge(), _fiber_pool);
         _status = fiber_status::ended;
         plDetachVirtualThread(false);

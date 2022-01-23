@@ -13,11 +13,6 @@ namespace np
 
     void mutex::lock() noexcept
     {
-        lock(detail::fiber_pool_instance);
-    }
-
-    void mutex::lock(fiber_pool_base* fiber_pool) noexcept
-    {
         for (;;)
         {
             status expect = status::locked;
@@ -42,12 +37,13 @@ namespace np
                 continue;
             }
 
-            assert(fiber_pool != nullptr && "Mutexes that end spinlock periods require a fiber pool");
+            auto fiber = this_fiber::instance();
+            assert(fiber && fiber->get_fiber_pool() != nullptr && "Fiber that block in mutexes must come from fiber pools");
 
-            _waiting_fibers.enqueue(fiber_pool->this_fiber());
+            _waiting_fibers.enqueue(fiber);
             //_status.store(status::locked, std::memory_order_release);
             _status.store(status::locked);
-            fiber_pool->block({});
+            fiber->get_fiber_pool()->block({});
         }
     }
 
@@ -60,11 +56,6 @@ namespace np
     }
 
     void mutex::unlock() noexcept
-    {
-        unlock(detail::fiber_pool_instance);
-    }
-
-    void mutex::unlock(fiber_pool_base* fiber_pool) noexcept
     {
         status expect_locked = status::locked;
         while (!_status.compare_exchange_strong(expect_locked, status::unlocking))
@@ -84,8 +75,8 @@ namespace np
         np::fiber_base* fiber;
         while (_waiting_fibers.try_dequeue(fiber))
         {
-            assert(fiber_pool != nullptr && "Mutexes with waiting fibers require a fiber pool");
-            fiber_pool->unblock({}, fiber);
+            assert(fiber && fiber->get_fiber_pool() != nullptr && "Mutexes with waiting fibers require a fiber pool");
+            fiber->get_fiber_pool()->unblock({}, fiber);
         }
 
         // Unlock now

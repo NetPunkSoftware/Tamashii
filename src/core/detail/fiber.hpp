@@ -21,8 +21,8 @@
 #	endif
 #endif
 
-#if !defined(NP_DETAIL_USE_NAKED_RESUME) && defined(_MSC_VER)
-    #define NP_DETAIL_USE_NAKED_RESUME
+#if !defined(NP_DETAIL_USE_NAKED_CONTEXT) //&& defined(_MSC_VER)
+    #define NP_DETAIL_USE_NAKED_CONTEXT
 #endif
 
 namespace np
@@ -97,11 +97,17 @@ namespace np
         }
 #endif
 
+        template<typename T, typename U> constexpr size_t offset_of(U T::*member)
+        {
+            return (char*)&((T*)nullptr->*member) - (char*)nullptr;
+        }
+
         // Method to call when resuming fibers
         using call_fn = boost::context::detail::transfer_t(*)(boost::context::detail::transfer_t);
-#if defined(_MSC_VER)
+#if defined(NP_DETAIL_USE_NAKED_CONTEXT)
         // Alloc memory only once, copy the bytes, and then point to it
         extern void* naked_resume_ptr;
+        extern void* naked_yield_ptr;
 #endif
 
         inline np::counter dummy_counter(true);

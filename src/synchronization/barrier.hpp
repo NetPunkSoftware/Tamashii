@@ -17,9 +17,6 @@ namespace np
 		void reset(std::size_t size) noexcept;
 		void wait() noexcept;
 
-		// Explicit methods
-		void wait(fiber_pool_base* fiber_pool) noexcept;
-
 	private:
 		std::size_t _size;
 		std::atomic<std::size_t> _waiting;

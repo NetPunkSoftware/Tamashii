@@ -17,9 +17,6 @@ namespace np
 		void notify() noexcept;
 		void wait(np::mutex& mutex) noexcept;
 
-		void notify(fiber_pool_base* fiber_pool) noexcept;
-		void wait(fiber_pool_base* fiber_pool, np::mutex& mutex) noexcept;
-
 	private:
 		np::fiber_base* _awaiter;
 	};
