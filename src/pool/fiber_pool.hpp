@@ -122,7 +122,7 @@ namespace np
 
         static fiber_pool<traits>* instance() noexcept;
 
-        void start(uint16_t number_of_threads = 0) noexcept;
+        void start(uint16_t number_of_threads = 0, bool with_main_thread = true) noexcept;
         void end() noexcept;
         void join() noexcept;
 
@@ -193,7 +193,7 @@ namespace np
     }
 
     template <typename traits>
-    void fiber_pool<traits>::start(uint16_t number_of_threads) noexcept
+    void fiber_pool<traits>::start(uint16_t number_of_threads, bool with_main_thread) noexcept
     {
         if (number_of_threads == 0)
         {
@@ -203,13 +203,11 @@ namespace np
         _number_of_threads = number_of_threads;
         _target_number_of_fibers = traits::maximum_fibers;
         
-        uint8_t main_worker_id = _fiber_worker_id++;
-        _thread_ids[main_worker_id] = std::this_thread::get_id();
         _running = true;
         _barrier.reset(number_of_threads);
 
         // Execute in other threads
-        for (int idx = 1; idx < number_of_threads; ++idx)
+        for (int idx = int(with_main_thread); idx < number_of_threads; ++idx)
         {
             // Set dispatcher fiber
             uint8_t worker_id = _fiber_worker_id++;
@@ -218,8 +216,12 @@ namespace np
         }
 
         // Execute in main thread
-        _dispatcher_fibers[main_worker_id] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
-        worker_thread(main_worker_id);
+        if (with_main_thread)
+        {
+            uint8_t main_worker_id = _fiber_worker_id++;
+            _dispatcher_fibers[main_worker_id] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
+            worker_thread(main_worker_id);
+        }
     }
 
     template <typename traits>

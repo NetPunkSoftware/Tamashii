@@ -47,8 +47,8 @@ inline int fib(int n) noexcept
     return fib(n - 1) + fib(n - 2);
 }
 
-np::executor executor;
-uint32_t executor_count;
+np::executor<> executor;
+std::atomic<uint32_t> executor_count;
 
 void f1_yield()
 {
@@ -206,17 +206,63 @@ void main_fiber(np::fiber_pool<>& pool)
     pool.end();
 }
 
+void yield_and_inc(np::executor<>& executor)
+{
+    np::this_fiber::yield();
+    executor.push([] { ++executor_count; });
+}
+
+void main_pool_b(np::fiber_pool<>& pool, np::executor<>& executor)
+{
+    np::counter counter;
+    global_counter = 0;
+    int max_iters = 2000;
+    for (int i = 0; i < max_iters; ++i)
+    {
+        pool.push([&executor] { yield_and_inc(executor); }, counter);
+        pool.push([&executor] { yield_and_inc(executor); }, counter);
+    }
+
+    spdlog::critical("WAIT {}", max_iters);
+    counter.wait();
+    spdlog::critical("DONE");
+
+    counter.reset();
+    pool.push([&executor] { executor.push([&executor] { executor.stop(); }); }, counter);
+    counter.wait();
+    executor.join();
+
+    assert(executor_count == max_iters * 2);
+
+    pool.end();
+}
 
 int main()
 {
     spdlog::set_level(spdlog::level::level_enum::critical);
     plInitAndStart("Fibers");
 
-    constexpr const uint8_t thread_num = 6;
-    np::fiber_pool<> pool;
-    pool.push([&pool] { main_fiber(pool); });
-    pool.start(thread_num);
-    pool.join();
+    //constexpr const uint8_t thread_num = 6;
+    //np::fiber_pool<> pool;
+    //pool.push([&pool] { main_fiber(pool); });
+    //pool.start(thread_num);
+    //pool.join();
+
+    // Fiber pool_a runs executors
+    np::executor<> executor;
+
+    np::fiber_pool<> pool_a;
+    pool_a.start(2, false);
+    pool_a.push([&executor] { executor.start(); });
+    pool_a.push([&executor] { executor.start(); });
+
+    np::fiber_pool<> pool_b;
+    pool_b.push([&pool_b, &executor] { main_pool_b(pool_b, executor); });
+    pool_b.start(6);
+    pool_b.join();
+
+    pool_a.end();
+    pool_a.join();
 
     plStopAndUninit();
 
