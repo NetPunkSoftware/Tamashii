@@ -14,7 +14,9 @@ namespace np
 
     fiber_pool_base::fiber_pool_base(bool create_instance) noexcept :
         _running(false),
+        _number_of_threads(0),
         _number_of_spawned_fibers(0),
+        _target_number_of_fibers(0),
         _worker_threads(),
         _fibers(),
         _awaiting_fibers(),
@@ -54,7 +56,7 @@ namespace np
         _awaiting_fibers.enqueue(fiber);
     }
 
-    uint8_t fiber_pool_base::thread_index() noexcept
+    uint8_t NP_NOINLINE fiber_pool_base::thread_index() noexcept
     {
         auto tid = std::this_thread::get_id();
         for (int idx = 0, size = _fiber_worker_id; idx < size; ++idx)

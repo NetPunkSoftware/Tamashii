@@ -14,11 +14,23 @@
 
 
 #ifdef __GNUC__ // GCC 4.8+, Clang, Intel and other compilers compatible with GCC (-std=c++0x or above)
-[[noreturn]] inline __attribute__((always_inline)) void unreachable() { __builtin_unreachable(); }
+
+    [[noreturn]] inline __attribute__((always_inline)) void unreachable() { __builtin_unreachable(); }
+
+    #define NP_NOINLINE __attribute__((noinline))
+
 #elif defined(_MSC_VER) // MSVC
-[[noreturn]] __forceinline void unreachable() { __assume(false); }
+
+    [[noreturn]] __forceinline void unreachable() { __assume(false); }
+    
+    #define NP_NOINLINE __declspec(noinline)
+
 #else // ???
-inline void unreachable() {}
+
+    inline void unreachable() {}
+
+    #define NP_NOINLINE
+
 #endif
 
 
@@ -53,6 +65,7 @@ namespace np
             static const bool preemtive_fiber_creation = true;
             static const uint32_t maximum_fibers = 300;
             static const uint32_t yield_priority = 2;
+            static const uint16_t maximum_threads = 256;
 
             // Fiber traits
             static const uint32_t inplace_function_size = 64;
@@ -70,7 +83,7 @@ namespace np
     public:
         fiber_pool_base(bool create_instance = true) noexcept;
 
-        static uint8_t thread_index() noexcept;
+        static NP_NOINLINE uint8_t thread_index() noexcept;
         static fiber_base* this_fiber() noexcept;
         void yield() noexcept;
 
@@ -132,6 +145,9 @@ namespace np
         template <typename F>
         void push(F&& function, np::counter& counter) noexcept;
 
+        template <typename T>
+        static T& threadlocal() noexcept;
+
     private:
         void worker_thread(uint8_t idx) noexcept;
 
@@ -170,7 +186,7 @@ namespace np
     {
         if constexpr (traits::preemtive_fiber_creation)
         {
-            np::fiber_base** fibers = new np::fiber_base*[traits::maximum_fibers];
+            np::fiber_base** fibers = new np::fiber_base * [traits::maximum_fibers];
             for (uint32_t i = 0; i < traits::maximum_fibers; ++i)
             {
 
@@ -202,7 +218,7 @@ namespace np
 
         _number_of_threads = number_of_threads;
         _target_number_of_fibers = traits::maximum_fibers;
-        
+
         _running = true;
         _barrier.reset(number_of_threads);
 
@@ -234,7 +250,7 @@ namespace np
             _tasks.enqueue({
                 .counter = get_dummy_counter(),
                 .function = std::forward<F>(function)
-            });
+                });
             return;
         }
 
@@ -254,12 +270,20 @@ namespace np
             _tasks.enqueue({
                 .counter = &counter,
                 .function = std::forward<F>(function)
-            });
+                });
             return;
         }
 
         reinterpret_cast<np::fiber<traits>*>(fiber)->reset(std::forward<F>(function), counter);
         _awaiting_fibers.enqueue(fiber);
+    }
+
+    template <typename traits>
+    template <typename T>
+    static T& fiber_pool<traits>::threadlocal() noexcept
+    {
+        static std::array<T, traits::maximum_threads> thread_local_ts {};
+        return thread_local_ts[thread_index()];
     }
 
     template <typename traits>
