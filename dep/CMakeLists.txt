@@ -47,7 +47,11 @@ if(NOT palanteer_POPULATED)
 endif()
 
 target_link_libraries(fibers PUBLIC libpalanteer)
-target_compile_definitions(fibers PUBLIC USE_PL=1 PL_VIRTUAL_THREADS=1)
+if (DISABLE_PALANTEER)
+    target_compile_definitions(fibers PUBLIC USE_PL=0 PL_VIRTUAL_THREADS=0)
+else()
+    target_compile_definitions(fibers PUBLIC USE_PL=1 PL_VIRTUAL_THREADS=1)
+endif()
 
 
 
