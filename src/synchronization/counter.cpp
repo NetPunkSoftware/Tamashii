@@ -46,8 +46,11 @@ namespace np
 	{
 		assert(_fiber.load(std::memory_order_relaxed) == nullptr && "Only one fiber can wait on a counter");
 
-		auto fiber = this_fiber::instance();
-		_fiber.store(fiber, std::memory_order_release);
-		fiber->get_fiber_pool()->block({});
+		if (_size)
+		{
+			auto fiber = this_fiber::instance();
+			_fiber.store(fiber, std::memory_order_release);
+			fiber->get_fiber_pool()->block({});
+		}
 	}
 }
