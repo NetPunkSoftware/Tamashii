@@ -10,9 +10,12 @@ namespace np
 
 	counter::counter(bool ignore_waiter) noexcept :
 		_ignore_waiter(ignore_waiter),
-        _size(0),
+		_size(0),
 		_done(0),
 		_fiber(nullptr)
+#if !defined(NDEBUG)
+		,_on_wait_end([] {})
+#endif
 	{}
 
 	void counter::reset() noexcept
@@ -52,5 +55,10 @@ namespace np
 			_fiber.store(fiber, std::memory_order_release);
 			fiber->get_fiber_pool()->block({});
 		}
+
+#if !defined(NDEBUG)
+		_on_wait_end();
+		_on_wait_end = [] {};
+#endif
 	}
 }
