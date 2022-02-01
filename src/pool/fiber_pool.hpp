@@ -446,6 +446,9 @@ namespace np
             fiber->execution_status(badge(), fiber_execution_status::ready);
             plEnd("Fiber execution");
         }
+        
+        // Clean up this thread id
+        _thread_ids[idx] = {};
     }
 
     template <typename traits>
