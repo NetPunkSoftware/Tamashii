@@ -58,8 +58,6 @@ namespace np
         fiber_base(const char* fiber_name, empty_fiber_t) noexcept;
         fiber_base(const char* fiber_name, std::size_t stack_size, empty_fiber_t) noexcept;
 
-        ~fiber_base() noexcept;
-
         fiber_base(const fiber_base&) = delete;
         fiber_base& operator=(const fiber_base&) = delete;
 
@@ -88,6 +86,10 @@ namespace np
         {
             return ::badge<fiber_base>{};
         }
+
+    // Only fiber may destroy fiber_base
+    protected:
+        ~fiber_base() noexcept;
 
     protected:
         // Context switching information

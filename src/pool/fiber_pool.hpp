@@ -113,6 +113,10 @@ namespace np
             return ::badge<fiber_pool_base>{};
         }
 
+    // Only fiber_pool may destroy fiber_pool_base
+    protected:
+        ~fiber_pool_base() noexcept = default;
+
     protected:
         static std::atomic<uint8_t> _fiber_worker_id;
         static std::array<std::thread::id, 256> _thread_ids;
@@ -127,6 +131,10 @@ namespace np
         moodycamel::ConcurrentQueue<np::fiber_base*> _fibers;
         moodycamel::ConcurrentQueue<np::fiber_base*> _awaiting_fibers;
         np::spinbarrier _barrier;
+
+#ifndef NDEBUG
+        bool _is_joined;
+#endif
     };
 
     template <typename traits = detail::default_fiber_pool_traits>
@@ -140,6 +148,7 @@ namespace np
 
     public:
         fiber_pool() noexcept;
+        ~fiber_pool() noexcept;
 
         static fiber_pool<traits>* instance() noexcept;
 
@@ -218,6 +227,21 @@ namespace np
 
             _fibers.enqueue_bulk(fibers, traits::maximum_fibers);
             delete[] fibers;
+        }
+    }
+
+    template <typename traits>
+    fiber_pool<traits>::~fiber_pool() noexcept
+    {  
+#ifndef NDEBUG
+        assert(_is_joined && "Pool went out of scope without being joined");
+#endif
+
+        np::fiber_base* fiber_base;
+        while (_fibers.try_dequeue(fiber_base))
+        {
+            auto fiber = reinterpret_cast<np::fiber<traits>*>(fiber_base);
+            delete fiber;
         }
     }
 
@@ -339,7 +363,7 @@ namespace np
         _barrier.wait();
 
         // Keep on getting tasks and running them
-        while (_running)
+        while (_running || _awaiting_fibers.size_approx() > 0)
         {
             plScope("Dispatcher loop");
 
@@ -446,7 +470,7 @@ namespace np
             fiber->execution_status(badge(), fiber_execution_status::ready);
             plEnd("Fiber execution");
         }
-        
+
         // Clean up this thread id
         _thread_ids[idx] = {};
     }
@@ -464,6 +488,8 @@ namespace np
         {
             t.join();
         }
+
+        _is_joined = true;
     }
 
     // Convinient wrappers around methods

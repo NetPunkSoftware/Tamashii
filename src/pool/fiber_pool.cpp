@@ -21,13 +21,16 @@ namespace np
         _fibers(),
         _awaiting_fibers(),
         _barrier(0)
+#ifndef NDEBUG
+        , _is_joined(false)
+#endif
     {
         if (create_instance)
         {
             detail::fiber_pool_instance = this;
         }
     }
-
+    
     fiber_base* fiber_pool_base::this_fiber() noexcept
     {
         return _running_fibers[thread_index()];
