@@ -3,9 +3,9 @@ find_package(Git REQUIRED)
 
 
 find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS context)
-target_include_directories(fibers SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
-target_link_directories(fibers PUBLIC ${Boost_LIBRARY_DIRS})
-target_link_libraries(fibers PUBLIC Boost::context)
+target_include_directories(tamashii SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
+target_link_directories(tamashii PUBLIC ${Boost_LIBRARY_DIRS})
+target_link_libraries(tamashii PUBLIC Boost::context)
 
 
 ####################################################################################
@@ -23,7 +23,7 @@ if(NOT moodycamel_POPULATED)
     add_subdirectory(${moodycamel_SOURCE_DIR} ${moodycamel_BINARY_DIR})
 endif()
 
-target_link_libraries(fibers PUBLIC concurrentqueue)
+target_link_libraries(tamashii PUBLIC concurrentqueue)
 
 
 
@@ -46,11 +46,11 @@ if(NOT palanteer_POPULATED)
     add_subdirectory(${palanteer_SOURCE_DIR} ${palanteer_BINARY_DIR})
 endif()
 
-target_link_libraries(fibers PUBLIC libpalanteer)
+target_link_libraries(tamashii PUBLIC libpalanteer)
 if (DISABLE_PALANTEER)
-    target_compile_definitions(fibers PUBLIC USE_PL=0 PL_VIRTUAL_THREADS=0)
+    target_compile_definitions(tamashii PUBLIC USE_PL=0 PL_VIRTUAL_THREADS=0)
 else()
-    target_compile_definitions(fibers PUBLIC USE_PL=1 PL_VIRTUAL_THREADS=1)
+    target_compile_definitions(tamashii PUBLIC USE_PL=1 PL_VIRTUAL_THREADS=1)
 endif()
 
 
@@ -69,7 +69,7 @@ if(NOT spdlog_POPULATED)
     add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR})
 endif()
 
-target_link_libraries(fibers PUBLIC spdlog)
+target_link_libraries(tamashii PUBLIC spdlog)
 
 
 
@@ -87,7 +87,7 @@ if(NOT sg14_POPULATED)
     add_subdirectory(${sg14_SOURCE_DIR} ${sg14_BINARY_DIR})
 endif()
 
-target_link_libraries(fibers PUBLIC sg14)
+target_link_libraries(tamashii PUBLIC sg14)
 
 
 

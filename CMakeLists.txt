@@ -4,7 +4,7 @@ if(${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 endif()
 
-project(Fibers VERSION 0.1 LANGUAGES CXX)
+project(Tamashii VERSION 0.1 LANGUAGES CXX)
 
 option(Boost_USE_STATIC_LIBS        "Use Boost static libs"     ON)
 option(DISABLE_PALANTEER            "Disable palanteer"         OFF)

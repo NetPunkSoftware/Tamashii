@@ -32,22 +32,22 @@ set(LIB_SOURCES
     utils/badge.hpp)
 
 # LIBRARY
-add_library(fibers STATIC ${LIB_SOURCES})
-target_compile_features(fibers PUBLIC cxx_std_20)
-target_include_directories(fibers PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(tamashii STATIC ${LIB_SOURCES})
+target_compile_features(tamashii PUBLIC cxx_std_20)
+target_include_directories(tamashii PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(Threads REQUIRED)
-target_link_libraries(fibers PUBLIC Threads::Threads)
+target_link_libraries(tamashii PUBLIC Threads::Threads)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_compile_definitions(fibers PUBLIC BOOST_ASIO_DISABLE_CONCEPTS)
-    target_link_libraries(fibers PUBLIC m)
+    target_compile_definitions(tamashii PUBLIC BOOST_ASIO_DISABLE_CONCEPTS)
+    target_link_libraries(tamashii PUBLIC m)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    target_compile_definitions(fibers PUBLIC _UNICODE UNICODE)
-    target_compile_options(fibers PUBLIC /MP /Zc:__cplusplus)
+    target_compile_definitions(tamashii PUBLIC _UNICODE UNICODE)
+    target_compile_options(tamashii PUBLIC /MP /Zc:__cplusplus)
 endif()
 
 # EXECUTABLE
-add_executable(fibers_test main.cpp)
-target_compile_features(fibers_test PUBLIC cxx_std_20)
-target_link_libraries(fibers_test PRIVATE fibers)
+add_executable(tamashii_test main.cpp)
+target_compile_features(tamashii_test PUBLIC cxx_std_20)
+target_link_libraries(tamashii_test PRIVATE tamashii)
