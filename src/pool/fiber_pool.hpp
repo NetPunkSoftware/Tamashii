@@ -100,7 +100,7 @@ namespace np
         template <typename T>
         static T& threadlocal() noexcept;
 
-        static uint8_t maximum_worker_id() const noexcept;
+        static uint8_t maximum_worker_id() noexcept;
 
     protected:
         np::counter* get_dummy_counter() noexcept;

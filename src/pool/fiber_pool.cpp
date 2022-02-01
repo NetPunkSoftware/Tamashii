@@ -76,7 +76,7 @@ namespace np
         return &detail::dummy_counter;
     }
 
-    uint8_t fiber_pool_base::maximum_worker_id() const noexcept
+    uint8_t fiber_pool_base::maximum_worker_id() noexcept
     {
         return _fiber_worker_id;
     }
