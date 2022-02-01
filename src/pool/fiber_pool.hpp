@@ -94,7 +94,7 @@ namespace np
         inline uint16_t number_of_threads() const noexcept;
         inline uint32_t target_number_of_fibers() const noexcept;
 
-        template <typeame T>
+        template <typename T>
         static T*& threadlocal_all() noexcept;
 
         template <typename T>
@@ -184,22 +184,17 @@ namespace np
         return _target_number_of_fibers;
     }
     
-    template <typeame T>
-    static T*& fiber_pool_base::threadlocal_all() noexcept
+    template <typename T>
+    T*& fiber_pool_base::threadlocal_all() noexcept
     {
         static std::array<T, 256> thread_local_ts {};
         return thread_local_ts;
     }
     
     template <typename T>
-    static T& fiber_pool_base::threadlocal() noexcept
+    T& fiber_pool_base::threadlocal() noexcept
     {
         return this->template threadlocal_all<T>[thread_index()];
-    }
-
-    static uint8_t fiber_pool_base::maximum_worker_id() const noexcept
-    {
-        return _fiber_worker_id;
     }
 
 
