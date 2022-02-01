@@ -94,6 +94,14 @@ namespace np
         inline uint16_t number_of_threads() const noexcept;
         inline uint32_t target_number_of_fibers() const noexcept;
 
+        template <typeame T>
+        static T*& threadlocal_all() noexcept;
+
+        template <typename T>
+        static T& threadlocal() noexcept;
+
+        static uint8_t maximum_worker_id() const noexcept;
+
     protected:
         np::counter* get_dummy_counter() noexcept;
 
@@ -145,9 +153,6 @@ namespace np
         template <typename F>
         void push(F&& function, np::counter& counter) noexcept;
 
-        template <typename T>
-        static T& threadlocal() noexcept;
-
     private:
         void worker_thread(uint8_t idx) noexcept;
 
@@ -178,6 +183,25 @@ namespace np
     {
         return _target_number_of_fibers;
     }
+    
+    template <typeame T>
+    static T*& fiber_pool_base::threadlocal_all() noexcept
+    {
+        static std::array<T, 256> thread_local_ts {};
+        return thread_local_ts;
+    }
+    
+    template <typename T>
+    static T& fiber_pool_base::threadlocal() noexcept
+    {
+        return this->template threadlocal_all<T>[thread_index()];
+    }
+
+    static uint8_t fiber_pool_base::maximum_worker_id() const noexcept
+    {
+        return _fiber_worker_id;
+    }
+
 
     template <typename traits>
     fiber_pool<traits>::fiber_pool() noexcept :
@@ -276,14 +300,6 @@ namespace np
 
         reinterpret_cast<np::fiber<traits>*>(fiber)->reset(std::forward<F>(function), counter);
         _awaiting_fibers.enqueue(fiber);
-    }
-
-    template <typename traits>
-    template <typename T>
-    static T& fiber_pool<traits>::threadlocal() noexcept
-    {
-        static std::array<T, traits::maximum_threads> thread_local_ts {};
-        return thread_local_ts[thread_index()];
     }
 
     template <typename traits>
