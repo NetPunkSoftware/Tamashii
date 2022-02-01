@@ -270,7 +270,7 @@ namespace np
         {
             // Set dispatcher fiber
             uint8_t worker_id = _fiber_worker_id++;
-            _dispatcher_fibers[worker_id] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
+            _dispatcher_fibers[worker_id] = new np::fiber<traits>("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
             _worker_threads.emplace_back(&fiber_pool<traits>::worker_thread, this, worker_id);
         }
 
@@ -278,7 +278,7 @@ namespace np
         if (with_main_thread)
         {
             uint8_t main_worker_id = _fiber_worker_id++;
-            _dispatcher_fibers[main_worker_id] = new np::fiber("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
+            _dispatcher_fibers[main_worker_id] = new np::fiber<traits>("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
             worker_thread(main_worker_id);
         }
     }
@@ -473,6 +473,10 @@ namespace np
 
         // Clean up this thread id
         _thread_ids[idx] = {};
+        
+        // Delete dispatcher fiber
+        auto fiber = reinterpret_cast<np::fiber<traits>*>(_dispatcher_fibers[idx]);
+        delete fiber;
     }
 
     template <typename traits>
