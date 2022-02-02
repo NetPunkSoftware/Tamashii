@@ -516,5 +516,12 @@ namespace np
             assert(this_fiber::fiber_pool() && "Must be called inside a fiber");
             this_fiber::fiber_pool()->yield();
         }
+
+        template <typename T, typename... Args>
+        inline void threadlocal(Args&&... args) noexcept
+        {
+            assert(this_fiber::fiber_pool() && "Must be called inside a fiber");
+            this_fiber::fiber_pool()->template threadlocal<T>(std::forward<Args>(args)...);
+        }
     }
 }
