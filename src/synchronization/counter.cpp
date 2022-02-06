@@ -18,6 +18,34 @@ namespace np
 #endif
 	{}
 
+	counter::counter(counter&& other) noexcept :
+		_ignore_waiter(other._ignore_waiter),
+		_size((std::size_t)other._size),
+		_done((std::size_t)other._done),
+		_fiber((fiber_base*)other._fiber)
+#if !defined(NDEBUG)
+		, _on_wait_end(std::move(other._on_wait_end))
+#endif
+	{
+		assert(other._size == other._done && "Can't move a counter that is still being actively used");
+	}
+
+	counter& counter::operator=(counter&& other) noexcept
+	{
+		assert(other._size == other._done && "Can't move a counter that is still being actively used");
+		
+		_ignore_waiter = other._ignore_waiter;
+		_size = (std::size_t)other._size;
+		_done = (std::size_t)other._done;
+		_fiber = (fiber_base*)other._fiber;
+		
+#if !defined(NDEBUG)
+		_on_wait_end = std::move(other._on_wait_end);
+#endif
+
+		return *this;
+	}
+
 	void counter::reset() noexcept
 	{
 		_size = 0;

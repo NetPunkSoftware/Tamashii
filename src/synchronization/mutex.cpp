@@ -25,6 +25,8 @@ namespace np
         _status = status(other._status);
         _waiting_fibers = std::move(other._waiting_fibers);
         other.unlock();
+
+		return *this;
     }
 
     void mutex::lock() noexcept

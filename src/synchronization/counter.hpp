@@ -17,6 +17,9 @@ namespace np
 		counter() noexcept;
 		counter(bool ignore_waiter) noexcept;
 
+		counter(counter&& other) noexcept;
+		counter& operator=(counter&& other) noexcept;
+
 		void reset() noexcept;
 		void wait() noexcept;
 

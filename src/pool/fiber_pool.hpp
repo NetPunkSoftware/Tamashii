@@ -95,7 +95,7 @@ namespace np
         inline uint32_t target_number_of_fibers() const noexcept;
 
         template <typename T>
-        static T*& threadlocal_all() noexcept;
+        static std::array<T, 256>& threadlocal_all() noexcept;
 
         template <typename T>
         static T& threadlocal() noexcept;
@@ -194,7 +194,7 @@ namespace np
     }
     
     template <typename T>
-    T*& fiber_pool_base::threadlocal_all() noexcept
+    std::array<T, 256>& fiber_pool_base::threadlocal_all() noexcept
     {
         static std::array<T, 256> thread_local_ts {};
         return thread_local_ts;
@@ -203,7 +203,7 @@ namespace np
     template <typename T>
     T& fiber_pool_base::threadlocal() noexcept
     {
-        return this->template threadlocal_all<T>[thread_index()];
+        return threadlocal_all<T>[thread_index()];
     }
 
 
