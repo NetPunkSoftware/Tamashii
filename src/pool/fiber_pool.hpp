@@ -368,15 +368,18 @@ namespace np
         // Keep on getting tasks and running them
         while (_running || _awaiting_fibers.size_approx() > 0)
         {
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 1
             plScope("Dispatcher loop");
-
+#endif
             // Temporal to hold an enqueued fiber
             np::fiber_base* fiber;
 
             // Get a free fiber from the pool
             if (!_awaiting_fibers.try_dequeue(fiber))
             {
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 2
                 plScope("Dispatcher cold");
+#endif
 
 #if defined(NETPUNK_SPINLOCK_PAUSE)
 #if defined(_MSC_VER)
@@ -425,7 +428,10 @@ namespace np
 #endif
 
             // Change execution context
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 3
             plBegin("Fiber execution");
+#endif
+
             fiber->execution_status(badge(), fiber_execution_status::executing);
             _running_fibers[idx] = fiber;
 
@@ -442,7 +448,10 @@ namespace np
             {
                 case fiber_status::ended:
                 {
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 3
                     plBegin("Dispatcher pop task");
+#endif
+
                     task_bundle task;
                     if (_tasks.try_dequeue(task))
                     {
@@ -453,14 +462,23 @@ namespace np
                     {
                         _fibers.enqueue(std::move(fiber));
                     }
+
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 3
                     plEnd("Dispatcher pop task");
+#endif
                 }
                 break;
 
                 case fiber_status::yielded:
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 3
                     plBegin("Dispatcher push awaiting");
+#endif
+
                     _awaiting_fibers.enqueue(std::move(fiber));
+
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 3
                     plEnd("Dispatcher push awaiting");
+#endif
                     break;
 
                 case fiber_status::blocked:
@@ -475,7 +493,10 @@ namespace np
             }
 
             fiber->execution_status(badge(), fiber_execution_status::ready);
+            
+#if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 3
             plEnd("Fiber execution");
+#endif
         }
 
         // Clean up this thread id
