@@ -11,6 +11,22 @@ namespace np
         _status(status::unlocked)
     {}
 
+    mutex::mutex(mutex&& other) noexcept
+    {
+        other.lock();
+        _status = status(other._status);
+        _waiting_fibers = std::move(other._waiting_fibers);
+        other.unlock();
+    }
+
+    mutex& mutex::operator=(mutex&& other) noexcept
+    {
+        other.lock();
+        _status = status(other._status);
+        _waiting_fibers = std::move(other._waiting_fibers);
+        other.unlock();
+    }
+
     void mutex::lock() noexcept
     {
         for (;;)

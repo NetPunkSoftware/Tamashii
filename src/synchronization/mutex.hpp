@@ -30,6 +30,9 @@ namespace np
     public:
         mutex() noexcept;
 
+        mutex(mutex&& other) noexcept;
+        mutex& operator=(mutex&& other) noexcept;
+
         void lock() noexcept;
         bool try_lock() noexcept;
         void unlock() noexcept;
