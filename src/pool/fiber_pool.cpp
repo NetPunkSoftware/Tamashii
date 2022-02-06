@@ -41,7 +41,11 @@ namespace np
         auto index = thread_index();
         auto fiber = _running_fibers[index];
         auto dispatcher = _dispatcher_fibers[index];
-        spdlog::debug("[{}] FIBER {}/{} YIELD", index, fiber->_id, fiber->status());
+
+#if defined(NETPUNK_TAMASHII_LOG)
+        spdlog::trace("[{}] FIBER {}/{} YIELD", index, fiber->_id, fiber->status());
+#endif
+
         fiber->yield(dispatcher);
     }
 
@@ -50,7 +54,11 @@ namespace np
         auto index = thread_index();
         auto fiber = _running_fibers[index];
         auto dispatcher = _dispatcher_fibers[index];
-        spdlog::debug("[{}] FIBER {}/{} BLOCK", index, fiber->_id, fiber->status());
+
+#if defined(NETPUNK_TAMASHII_LOG)
+        spdlog::trace("[{}] FIBER {}/{} BLOCK", index, fiber->_id, fiber->status());
+#endif
+
         fiber->yield_blocking(dispatcher);
     }
 

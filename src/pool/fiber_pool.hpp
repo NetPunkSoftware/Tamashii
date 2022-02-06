@@ -343,7 +343,10 @@ namespace np
 #else
                 fiber = new np::fiber<traits>(traits::fiber_stack_size, &detail::invalid_fiber_guard);
 #endif
-                spdlog::debug("[{}] FIBER {} CREATED", fiber->_id);
+
+#if defined(NETPUNK_TAMASHII_LOG)
+                spdlog::trace("[{}] FIBER {} CREATED", fiber->_id);
+#endif
             }
         }
 
@@ -417,7 +420,9 @@ namespace np
                 continue;
             }
 
-            spdlog::debug("[{}] FIBER {}/{} EXECUTE", idx, fiber->_id, fiber->status());
+#if defined(NETPUNK_TAMASHII_LOG)
+            spdlog::trace("[{}] FIBER {}/{} EXECUTE", idx, fiber->_id, fiber->status());
+#endif
 
             // Change execution context
             plBegin("Fiber execution");
@@ -428,7 +433,9 @@ namespace np
             _dispatcher_fibers[idx]->resume(this, fiber);
             plAttachVirtualThread(_dispatcher_fibers[idx]->_id);
 
-            spdlog::debug("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
+#if defined(NETPUNK_TAMASHII_LOG)
+            spdlog::trace("[{}] FIBER {}/{} IS BACK", idx, fiber->_id, fiber->status());
+#endif
 
             // Push fiber back
             switch (fiber->status())
