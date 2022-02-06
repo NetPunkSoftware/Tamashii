@@ -203,7 +203,7 @@ namespace np
     template <typename T>
     T& fiber_pool_base::threadlocal() noexcept
     {
-        return threadlocal_all<T>[thread_index()];
+        return threadlocal_all<T>()[thread_index()];
     }
 
 
