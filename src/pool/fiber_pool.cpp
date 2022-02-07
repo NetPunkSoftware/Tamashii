@@ -21,6 +21,9 @@ namespace np
         _fibers(),
         _awaiting_fibers(),
         _barrier(0)
+#ifdef TAMASHII_INTERNAL_FIBER_POOL_TRACK_BLOCKED
+        , _number_of_blocked_fibers(0)
+#endif
 #ifndef NDEBUG
         , _is_joined(false)
 #endif
@@ -64,6 +67,10 @@ namespace np
 
     void fiber_pool_base::unblock(np::fiber_base* fiber) noexcept
     {
+#ifdef TAMASHII_INTERNAL_FIBER_POOL_TRACK_BLOCKED
+        --_number_of_blocked_fibers;
+#endif
+
         _awaiting_fibers.enqueue(fiber);
     }
 

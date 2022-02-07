@@ -33,6 +33,10 @@
 
 #endif
 
+#if !defined(NDEBUG) || defined(TAMASHII_FIBER_POOL_TRACK_BLOCKED)
+    #define TAMASHII_INTERNAL_FIBER_POOL_TRACK_BLOCKED
+#endif
+
 
 namespace np
 {
@@ -132,6 +136,10 @@ namespace np
         moodycamel::ConcurrentQueue<np::fiber_base*> _awaiting_fibers;
         np::spinbarrier _barrier;
 
+#ifdef TAMASHII_INTERNAL_FIBER_POOL_TRACK_BLOCKED
+        std::atomic<uint32_t> _number_of_blocked_fibers;
+#endif
+
 #ifndef NDEBUG
         bool _is_joined;
 #endif
@@ -225,6 +233,7 @@ namespace np
 #endif
             }
 
+            _number_of_spawned_fibers = traits::maximum_fibers;
             _fibers.enqueue_bulk(fibers, traits::maximum_fibers);
             delete[] fibers;
         }
@@ -399,6 +408,19 @@ namespace np
                 // Enqueueing and dequeueing a fiber is easier than a task, go that way
                 if (!_fibers.try_dequeue(fiber))
                 {
+#ifdef TAMASHII_INTERNAL_FIBER_POOL_TRACK_BLOCKED
+                    if (_number_of_blocked_fibers == _number_of_spawned_fibers)
+                    {
+                        ++_number_of_spawned_fibers;
+                        spdlog::critical("fiber_pool ran out of fibers, increase maximum spawn to {}", _number_of_spawned_fibers);
+#if defined(NDEBUG)
+                        fiber = new np::fiber<traits>(traits::fiber_stack_size, empty_fiber_t{});
+#else
+                        fiber = new np::fiber<traits>(traits::fiber_stack_size, &detail::invalid_fiber_guard);
+#endif
+                    }
+                    else
+#endif
                     continue;
                 }
 
@@ -482,6 +504,9 @@ namespace np
                     break;
 
                 case fiber_status::blocked:
+#ifdef TAMASHII_INTERNAL_FIBER_POOL_TRACK_BLOCKED
+                    ++_number_of_blocked_fibers;
+#endif
                     // Do nothing, the mutex will already hold a reference to the fiber
                     break;
 
