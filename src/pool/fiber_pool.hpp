@@ -546,7 +546,9 @@ namespace np
             t.join();
         }
 
+#ifndef NDEBUG
         _is_joined = true;
+#endif
     }
 
     // Convinient wrappers around methods
