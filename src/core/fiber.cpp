@@ -58,7 +58,7 @@ namespace np
             };
         #endif
 
-        // using call_fn = boost::context::detail::transfer_t(*)(boost::context::detail::transfer_t);
+        // using call_fn = fcontext_transfer_t(*)(fcontext_transfer_t);
 
         // Alloc memory only once, copy the bytes, and then point to it        
         void* naked_resume_ptr = ([]() {

@@ -4,8 +4,7 @@
 #include "synchronization/counter.hpp"
 #include "utils/badge.hpp"
 
-#include <boost/context/fiber_fcontext.hpp>
-#include <boost/context/detail/fcontext.hpp>
+#include <fcontext/fcontext.h>
 
 #include <inplace_function.h>
 #include <palanteer.h>
@@ -18,7 +17,7 @@ namespace np
 {
     namespace detail
     {
-        inline void builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
+        inline void builtin_fiber_entrypoint(fcontext_transfer_t transfer) noexcept;
     }
 
 
@@ -33,7 +32,7 @@ namespace np
     {
         friend class fiber_pool_base;
         template <typename T> friend class fiber_pool;
-        friend inline void detail::builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept;
+        friend inline void detail::builtin_fiber_entrypoint(fcontext_transfer_t transfer) noexcept;
 
     public:
         using fiber_base::fiber_base;
@@ -75,7 +74,7 @@ namespace np
         stdext::inplace_function<void(), traits::inplace_function_size> _function;
     };
 
-    
+
     template <typename traits>
     template <typename F>
     fiber<traits>::fiber(F&& function) noexcept :
@@ -84,7 +83,7 @@ namespace np
 
     template <typename traits>
     template <typename F>
-    fiber<traits>::fiber(std::size_t stack_size, F && function) noexcept :
+    fiber<traits>::fiber(std::size_t stack_size, F&& function) noexcept :
         fiber{ "Fibers/%d", stack_size, std::forward<F>(function) }
     {}
 
@@ -131,9 +130,9 @@ namespace np
         _function = std::forward<F>(function);
         _counter = &counter;
 #if defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
-        _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
+        _ctx = make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
 #else
-        _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
+        _ctx = make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
 #endif
         _status = fiber_status::initialized;
     }
@@ -150,13 +149,13 @@ namespace np
 
     namespace detail
     {
-        inline void builtin_fiber_entrypoint(boost::context::detail::transfer_t transfer) noexcept
+        inline void builtin_fiber_entrypoint(fcontext_transfer_t transfer) noexcept
         {
             // TODO(gpascualg): Casting to default traits should not be a problem, as all allocation has already been done
             //  and data that depends on traits (ie. its size is given by traits)
             auto fiber = reinterpret_cast<np::fiber<default_fiber_traits>*>(transfer.data);
             fiber->execute();
-            boost::context::detail::jump_fcontext(*fiber->_former_ctx, 0);
+            jump_fcontext(*fiber->_former_ctx, 0);
         }
     }
 }

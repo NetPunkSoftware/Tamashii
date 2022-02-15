@@ -2,10 +2,43 @@ include(FetchContent)
 find_package(Git REQUIRED)
 
 
-find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS context)
-target_include_directories(tamashii SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
-target_link_directories(tamashii PUBLIC ${Boost_LIBRARY_DIRS})
-target_link_libraries(tamashii PUBLIC Boost::context)
+
+####################################################################################
+# Deboost::Context
+FetchContent_Declare(
+    deboost_context
+    GIT_REPOSITORY https://github.com/septag/deboost.context
+    GIT_TAG        63476334fea6ccc4f2cc1de1d91257c3fe8b8fd3
+)
+
+FetchContent_GetProperties(deboost_context)
+if(NOT deboost_context_POPULATED)
+    FetchContent_Populate(deboost_context)
+
+    add_subdirectory(${deboost_context_SOURCE_DIR} ${deboost_context_BINARY_DIR})
+endif()
+
+target_link_libraries(tamashii PUBLIC fcontext)
+
+
+
+####################################################################################
+# Preprocessor
+FetchContent_Declare(
+    boostorg_preprocessor
+    GIT_REPOSITORY https://github.com/boostorg/preprocessor
+    GIT_TAG        24abbdc9063116bdf97becab32bb6133a9a9407b
+)
+
+FetchContent_GetProperties(boostorg_preprocessor)
+if(NOT boostorg_preprocessor_POPULATED)
+    FetchContent_Populate(boostorg_preprocessor)
+
+    add_subdirectory(${boostorg_preprocessor_SOURCE_DIR} ${boostorg_preprocessor_BINARY_DIR})
+endif()
+
+target_link_libraries(tamashii PUBLIC boost_preprocessor)
+
 
 
 ####################################################################################

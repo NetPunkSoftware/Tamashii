@@ -51,13 +51,13 @@ namespace np
         #if defined(NP_DETAIL_USING_FIBER_GUARD_STACK)
             _stack_size = detail::round_up(stack_size, page_size);
             _stack = detail::aligned_malloc(page_size + _stack_size + page_size, page_size);
-            _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
+            _ctx = make_fcontext(static_cast<char*>(_stack) + page_size + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
         
             detail::memory_guard(_stack, page_size);
             detail::memory_guard(static_cast<char*>(_stack) + page_size + _stack_size, page_size);
         #else
             _stack = detail::aligned_malloc(_stack_size, sizeof(uintptr_t));
-            _ctx = boost::context::detail::make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
+            _ctx = make_fcontext(static_cast<char*>(_stack) + _stack_size, _stack_size, &detail::builtin_fiber_entrypoint);
         #endif
     }
 
@@ -110,8 +110,8 @@ namespace np
 #else
         detail::call_fn fiber_yield = &detail::builtin_fiber_yield;
 #endif
-        boost::context::detail::ontop_fcontext(_former_ctx, &_ctx, fiber_yield);
-        // boost::context::detail::jump_fcontext(_former_ctx, 0);
+        ontop_fcontext(_former_ctx, &_ctx, fiber_yield);
+        // jump_fcontext(_former_ctx, 0);
     }
 
     void fiber_base::yield(fiber_base* to) noexcept
@@ -124,7 +124,7 @@ namespace np
 #else
         detail::call_fn fiber_yield = &detail::builtin_fiber_yield;
 #endif
-        boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, fiber_yield);
+        ontop_fcontext(to->_ctx, &_ctx, fiber_yield);
     }
 
     void fiber_base::yield_blocking(fiber_base* to) noexcept
@@ -137,6 +137,6 @@ namespace np
 #else
         detail::call_fn fiber_yield = &detail::builtin_fiber_yield;
 #endif
-        boost::context::detail::ontop_fcontext(to->_ctx, &_ctx, fiber_yield);
+        ontop_fcontext(to->_ctx, &_ctx, fiber_yield);
     }
 }

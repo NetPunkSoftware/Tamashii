@@ -2,8 +2,7 @@
 
 #include "synchronization/counter.hpp"
 
-#include <boost/context/fiber_fcontext.hpp>
-#include <boost/context/detail/fcontext.hpp>
+#include <fcontext/fcontext.h>
 
 #include <cstdlib>
 #include <functional>
@@ -107,7 +106,7 @@ namespace np
         }
 
         // Method to call when resuming fibers
-        using call_fn = boost::context::detail::transfer_t(*)(boost::context::detail::transfer_t);
+        using call_fn = fcontext_transfer_t(*)(fcontext_transfer_t);
 #if defined(NP_DETAIL_USE_NAKED_CONTEXT)
         // Alloc memory only once, copy the bytes, and then point to it
         extern void* naked_resume_ptr;

@@ -9,14 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/assert.hpp>
-#include <boost/config.hpp>
-
-
-#if BOOST_COMP_CLANG
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wunused-private-field"
-#endif
 
 namespace np 
 {
@@ -129,7 +121,7 @@ namespace np
             if ( top <= bottom) {
                 // queue is not empty
                 ctx = a->pop( bottom);
-                BOOST_ASSERT( nullptr != ctx);
+                assert( nullptr != ctx);
                 if ( top == bottom) {
                     // last element dequeued
                     if ( ! top_.compare_exchange_strong( top, top + 1,
@@ -156,7 +148,7 @@ namespace np
                 // queue is not empty
                 array * a = array_.load( std::memory_order_consume);
                 ctx = a->pop( top);
-                BOOST_ASSERT( nullptr != ctx);
+                assert( nullptr != ctx);
                 // do not steal pinned context (e.g. main-/dispatcher-context)
                 // if ( ctx->is_context( type::pinned_context) ) {
                 //     return nullptr;

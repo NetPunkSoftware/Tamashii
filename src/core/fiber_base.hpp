@@ -4,9 +4,9 @@
 #include "synchronization/counter.hpp"
 #include "utils/badge.hpp"
 
-#include <boost/context/fiber_fcontext.hpp>
-#include <boost/context/detail/fcontext.hpp>
+#include <fcontext/fcontext.h>
 
+#include <cassert>
 #include <inttypes.h>
 
 
@@ -14,8 +14,8 @@ namespace np
 {
     namespace detail
     {
-        inline boost::context::detail::transfer_t builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
-        inline boost::context::detail::transfer_t builtin_fiber_yield(boost::context::detail::transfer_t transfer) noexcept;
+        inline fcontext_transfer_t builtin_fiber_resume(fcontext_transfer_t transfer) noexcept;
+        inline fcontext_transfer_t builtin_fiber_yield(fcontext_transfer_t transfer) noexcept;
     }
 
 
@@ -43,8 +43,8 @@ namespace np
     {
         friend class fiber_pool_base;
         template <typename traits> friend class fiber_pool;
-        friend inline boost::context::detail::transfer_t detail::builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept;
-        friend inline boost::context::detail::transfer_t detail::builtin_fiber_yield(boost::context::detail::transfer_t transfer) noexcept;
+        friend inline fcontext_transfer_t detail::builtin_fiber_resume(fcontext_transfer_t transfer) noexcept;
+        friend inline fcontext_transfer_t detail::builtin_fiber_yield(fcontext_transfer_t transfer) noexcept;
 
     protected:
         static inline uint32_t current_id = 10000;
@@ -87,14 +87,14 @@ namespace np
             return ::badge<fiber_base>{};
         }
 
-    // Only fiber may destroy fiber_base
+        // Only fiber may destroy fiber_base
     protected:
         ~fiber_base() noexcept;
 
     protected:
         // Context switching information
-        boost::context::detail::fcontext_t _ctx;
-        boost::context::detail::fcontext_t* _former_ctx;
+        fcontext_t _ctx;
+        fcontext_t* _former_ctx;
         fiber_pool_base* _fiber_pool;
 
         // Fiber information
@@ -158,24 +158,24 @@ namespace np
         detail::call_fn fiber_resume = &detail::builtin_fiber_resume;
 #endif
 
-        boost::context::detail::ontop_fcontext(fiber->_ctx, fiber, fiber_resume);
+        ontop_fcontext(fiber->_ctx, fiber, fiber_resume);
         return *fiber;
     }
 
 
     namespace detail
     {
-        inline boost::context::detail::transfer_t builtin_fiber_resume(boost::context::detail::transfer_t transfer) noexcept
+        inline fcontext_transfer_t builtin_fiber_resume(fcontext_transfer_t transfer) noexcept
         {
             auto fiber = reinterpret_cast<np::fiber_base*>(transfer.data);
-            *fiber->_former_ctx = transfer.fctx;
+            *fiber->_former_ctx = transfer.ctx;
             return { nullptr, nullptr };
         }
 
-        inline boost::context::detail::transfer_t builtin_fiber_yield(boost::context::detail::transfer_t transfer) noexcept
+        inline fcontext_transfer_t builtin_fiber_yield(fcontext_transfer_t transfer) noexcept
         {
-            auto ctx = (boost::context::detail::fcontext_t*)transfer.data;
-            *ctx = transfer.fctx;
+            auto ctx = (fcontext_t*)transfer.data;
+            *ctx = transfer.ctx;
             return { nullptr, nullptr };
         }
     }
