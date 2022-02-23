@@ -41,7 +41,10 @@ target_link_libraries(tamashii PUBLIC Threads::Threads)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_definitions(tamashii PUBLIC BOOST_ASIO_DISABLE_CONCEPTS)
-    target_link_libraries(tamashii PUBLIC m)
+
+    if (NOT WIN32)
+        target_link_libraries(tamashii PUBLIC m)
+    endif()
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_definitions(tamashii PUBLIC _UNICODE UNICODE)
     target_compile_options(tamashii PUBLIC /MP /Zc:__cplusplus)
