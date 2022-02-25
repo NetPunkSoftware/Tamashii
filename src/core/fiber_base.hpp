@@ -77,6 +77,7 @@ namespace np
         void yield(fiber_base* to) noexcept;
 
         // Explicit methods
+        inline void set_fiber_pool(::badge<fiber_pool_base>, fiber_pool_base* fiber_pool) noexcept;
         inline fiber_base& resume(fiber_pool_base* fiber_pool, fiber_base* fiber) noexcept;
 
     protected:
@@ -162,6 +163,10 @@ namespace np
         return *fiber;
     }
 
+    inline void fiber_base::set_fiber_pool(::badge<fiber_pool_base>, fiber_pool_base* fiber_pool) noexcept
+    {
+        _fiber_pool = fiber_pool;
+    }
 
     namespace detail
     {

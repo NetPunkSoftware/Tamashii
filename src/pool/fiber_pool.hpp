@@ -128,6 +128,8 @@ namespace np
         static std::array<np::fiber_base*, 256> _dispatcher_fibers;
 
         bool _running;
+        bool _with_main_thread;
+        uint8_t _main_worker_id;
         uint16_t _number_of_threads;
         uint32_t _number_of_spawned_fibers;
         uint32_t _target_number_of_fibers;
@@ -252,6 +254,14 @@ namespace np
             auto fiber = reinterpret_cast<np::fiber<traits>*>(fiber_base);
             delete fiber;
         }
+
+        // If main thread did not join, we need to do cleanup now
+        if (!_with_main_thread)
+        {
+            _thread_ids[_main_worker_id] = {};
+            auto fiber = reinterpret_cast<np::fiber<traits>*>(_dispatcher_fibers[_main_worker_id]);
+            delete fiber;
+        }
     }
 
     template <typename traits>
@@ -280,15 +290,23 @@ namespace np
             // Set dispatcher fiber
             uint8_t worker_id = _fiber_worker_id++;
             _dispatcher_fibers[worker_id] = new np::fiber<traits>("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
+            _dispatcher_fibers[worker_id]->set_fiber_pool(badge(), this);
+            _running_fibers[worker_id] = _dispatcher_fibers[worker_id];
             _worker_threads.emplace_back(&fiber_pool<traits>::worker_thread, this, worker_id);
         }
 
+        // Even if we don't want main thread execution, assign an id to the thread
+        _main_worker_id = _fiber_worker_id++;
+        _thread_ids[_main_worker_id] = std::this_thread::get_id();
+        _dispatcher_fibers[_main_worker_id] = new np::fiber<traits>("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
+        _dispatcher_fibers[_main_worker_id]->set_fiber_pool(badge(), this);
+        _running_fibers[_main_worker_id] = _dispatcher_fibers[_main_worker_id];
+
         // Execute in main thread
+        _with_main_thread = with_main_thread;
         if (with_main_thread)
         {
-            uint8_t main_worker_id = _fiber_worker_id++;
-            _dispatcher_fibers[main_worker_id] = new np::fiber<traits>("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
-            worker_thread(main_worker_id);
+            worker_thread(_main_worker_id);
         }
     }
 
