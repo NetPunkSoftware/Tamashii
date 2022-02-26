@@ -393,7 +393,7 @@ namespace np
         _barrier.wait();
 
         // Keep on getting tasks and running them
-        while (_running || _awaiting_fibers.size_approx() > 0)
+        while (true)
         {
 #if defined(NETPUNK_TAMASHII_PALANTEER_INTERNAL) && NETPUNK_TAMASHII_PALANTEER_INTERNAL >= 1
             plScope("Dispatcher loop");
@@ -420,6 +420,12 @@ namespace np
                 // But first try an early out
                 if (_tasks.size_approx() == 0)
                 {
+                    // Exit pool if it is not running anymore
+                    if (!_running)
+                    {
+                        break;
+                    }
+
                     continue;
                 }
 
