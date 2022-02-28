@@ -163,6 +163,7 @@ namespace np
         static fiber_pool<traits>* instance() noexcept;
 
         void start(uint16_t number_of_threads = 0, bool with_main_thread = true) noexcept;
+        void enable_main_thread_calls_here() noexcept;
         void end() noexcept;
         void join() noexcept;
 
@@ -305,7 +306,6 @@ namespace np
 
         // Even if we don't want main thread execution, assign an id to the thread
         _main_worker_id = _fiber_worker_id++;
-        _thread_ids[_main_worker_id] = std::this_thread::get_id();
         _dispatcher_fibers[_main_worker_id] = new np::fiber<traits>("Dispatcher/%d", traits::fiber_stack_size, empty_fiber_t{});
         _dispatcher_fibers[_main_worker_id]->set_fiber_pool(badge(), this);
         _running_fibers[_main_worker_id] = _dispatcher_fibers[_main_worker_id];
@@ -316,6 +316,17 @@ namespace np
         {
             worker_thread(_main_worker_id);
         }
+    }
+
+    template <typename traits>
+    void fiber_pool<traits>::enable_main_thread_calls_here() noexcept
+    {
+        for (uint8_t i = 0; i < _fiber_worker_id; ++i)
+        {
+            assert(_thread_ids[i] != std::this_thread::get_id() && "Only one pool can own the main thread");
+        }
+
+        _thread_ids[_main_worker_id] = std::this_thread::get_id();
     }
 
     template <typename traits>
