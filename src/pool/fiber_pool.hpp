@@ -222,6 +222,10 @@ namespace np
         fiber_pool_base(),
         _tasks()
     {
+#if defined(NETPUNK_TAMASHII_LOG)
+        spdlog::trace("fiber_pool constructor called");
+#endif
+
         if constexpr (traits::preemtive_fiber_creation)
         {
             np::fiber_base** fibers = new np::fiber_base * [traits::maximum_fibers];
@@ -246,6 +250,10 @@ namespace np
     {  
 #ifndef NDEBUG
         assert(_is_joined && "Pool went out of scope without being joined");
+#endif
+
+#if defined(NETPUNK_TAMASHII_LOG)
+        spdlog::trace("fiber_pool destructor called");
 #endif
 
         np::fiber_base* fiber_base;
@@ -372,7 +380,7 @@ namespace np
 #endif
 
 #if defined(NETPUNK_TAMASHII_LOG)
-                spdlog::trace("[{}] FIBER {} CREATED", fiber->_id);
+                spdlog::trace("[-] FIBER {} CREATED", fiber->_id);
 #endif
             }
         }
@@ -385,6 +393,10 @@ namespace np
     {
         plDeclareThreadDyn("Workers/%d", idx);
         plAttachVirtualThread(_dispatcher_fibers[idx]->_id);
+
+#if defined(NETPUNK_TAMASHII_LOG)
+        spdlog::trace("[{}] WORKER {}", (uintptr_t)this, idx);
+#endif
 
         // Thread data
         _thread_ids[idx] = std::this_thread::get_id();
@@ -547,6 +559,10 @@ namespace np
             plEnd("Fiber execution");
 #endif
         }
+
+#if defined(NETPUNK_TAMASHII_LOG)
+        spdlog::trace("[{}] FIBERPOOL THREAD {} ENDS", (uintptr_t)this, idx);
+#endif
 
         // Clean up this thread id
         _thread_ids[idx] = {};

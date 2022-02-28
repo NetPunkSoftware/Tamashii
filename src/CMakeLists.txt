@@ -39,6 +39,10 @@ target_include_directories(tamashii PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Threads REQUIRED)
 target_link_libraries(tamashii PUBLIC Threads::Threads)
 
+if (NETPUNK_TAMASHII_LOG)
+    target_compile_definitions(tamashii PUBLIC NETPUNK_TAMASHII_LOG=1)
+endif()
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_definitions(tamashii PUBLIC BOOST_ASIO_DISABLE_CONCEPTS)
 
